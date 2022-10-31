@@ -22,20 +22,6 @@ fn main() {
     }
 }
 
-fn input_to_u8(string: String) -> u8 {
-    loop {
-        println!("{string}");
-        let mut value = String::new();
-        io::stdin()
-            .read_line(&mut value)
-            .expect("Failed to read line.");
-        match value.trim().parse() {
-            Ok(num) => return num,
-            Err(_) => continue,
-        };
-    }
-}
-
 fn input_into_number<T: FromStr>(string: String) -> T {
     loop {
         println!("{string}");
