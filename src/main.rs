@@ -1,14 +1,15 @@
 use rand::Rng;
 use std::io;
+use std::str::FromStr;
 
 fn main() {
     let mut count = 0;
 
-    let games = input_to_u8("How many games would you like?".to_owned());
+    let games = input_into_number::<u16>("How many games would you like?".to_owned());
 
-    let numbers = input_to_u8(String::from("How many numbers to choose from?"));
+    let numbers = input_into_number::<u8>(String::from("How many numbers to choose from?"));
 
-    let pick = input_to_u8(String::from("How many numbers to pick from?"));
+    let pick = input_into_number::<u8>(String::from("How many numbers to pick from?"));
 
     while count < games {
         let random_numbers = generate_numbers(numbers, pick);
@@ -22,6 +23,20 @@ fn main() {
 }
 
 fn input_to_u8(string: String) -> u8 {
+    loop {
+        println!("{string}");
+        let mut value = String::new();
+        io::stdin()
+            .read_line(&mut value)
+            .expect("Failed to read line.");
+        match value.trim().parse() {
+            Ok(num) => return num,
+            Err(_) => continue,
+        };
+    }
+}
+
+fn input_into_number<T: FromStr>(string: String) -> T {
     loop {
         println!("{string}");
         let mut value = String::new();
