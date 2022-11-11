@@ -4,38 +4,73 @@ use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct Parameters {
-    games: u16,
+    pub games: u16,
     numbers_start: u8,
     numbers_end: u8,
     pick: u8,
 }
 
 impl Parameters {
-    fn new() -> Self {
+    ///
+    pub fn new(g: u16, ns: u8, ne: u8, pick: u8) -> Self {
         Parameters {
-            games: 1,
-            numbers_start: 1,
-            numbers_end: 10,
-            pick: 5
+            games: g,
+            numbers_start: ns,
+            numbers_end: ne,
+            pick,
         }
     }
 
-    fn () {
-        
+    /// Function that receives the max number and the pick value
+    /// to generete random numbers.
+    ///
+    /// Example:
+    /// From 18 numbers, we want to pick 10.
+    /// ```
+    /// use random_lotto_numbers as rln;
+    ///
+    /// let param = rln::Parameters::new(1, 1, 18, 10);
+    ///
+    /// let gen = param.generate_game();
+    ///
+    /// assert_eq!(10 as usize, gen.len());
+    /// ```
+    pub fn generate_game(&self) -> Vec<u8> {
+        let mut games: Vec<u8> = (self.numbers_start..=self.numbers_end).collect();
+
+        let not_pick = games.len() - self.pick as usize;
+
+        if self.pick as usize >= not_pick {
+            let mut count = 0;
+            while count < not_pick {
+                games.remove(rand::thread_rng().gen_range(0..games.len()));
+                count += 1;
+            }
+        } else {
+            games.clear();
+            while games.len() < self.pick as usize {
+                let random = rand::thread_rng().gen_range(self.numbers_start..=self.numbers_end);
+                if games.contains(&random) {
+                    continue;
+                } else {
+                    games.push(random)
+                }
+            }
+        }
+        games.sort();
+        games
     }
 }
 
-/// Function that receives a user input and expects to make a number
-/// FromStr.
-/// 
-/// Examples:
-/// From 18 numbers, we want to pick 10.
+/// Function that receives a user input and expects to make a unsigned/signed integer
+/// Uses the FromStr Trait to provide that.
+///
 /// ```
 /// use random_lotto_numbers as rln;
-/// 
-/// let input = rln::input_into_number::<u8>(&String::from(" 7".trim()));
-/// 
-/// assert_eq!(7 as u8, input);
+///
+/// let input = rln::input_into_number::<u8>(&" 7".trim());
+///
+/// assert_eq!(7, input);
 /// ```
 pub fn input_into_number<T: FromStr>(string: &str) -> T {
     loop {
@@ -54,44 +89,28 @@ pub fn input_into_number<T: FromStr>(string: &str) -> T {
     }
 }
 
+pub mod probability {
+    use num_bigint::{BigUint, ToBigUint};
 
-/// Function that receives the max number and the pick value
-/// to generete random numbers.
-/// 
-/// Example:
-/// From 18 numbers, we want to pick 10.
-/// ```
-/// use random_lotto_numbers as rln;
-/// 
-/// let x: u8 = 18;
-/// let y: u8 = 10;
-/// 
-/// let gen = rln::generate_numbers(x, y);
-/// 
-/// assert_eq!(10 as usize, gen.len());
-/// ```
-pub fn generate_numbers(numbers: u8, pick: u8) -> Vec<u8> {
-    let mut game_numbers: Vec<u8> = (1..=numbers).collect();
+    /// Calculates Permutation of (n, r) as
+    ///
+    ///
+    pub fn combinations(n: u8, r: u8) -> BigUint {
+        factorial(&n) / (factorial(&r) * factorial(&(n - r)))
+    }
 
-    let not_pick = game_numbers.len() - pick as usize;
-
-    if pick as usize >= not_pick {
-        let mut count = 0;
-        while count < not_pick {
-            game_numbers.remove(rand::thread_rng().gen_range(0..game_numbers.len()));
-            count += 1;
-        }
-    } else {
-        game_numbers.clear();
-        while game_numbers.len() < pick as usize {
-            let random = rand::thread_rng().gen_range(1..=numbers);
-            if game_numbers.contains(&random) {
-                continue;
-            } else {
-                game_numbers.push(random)
+    /// Generates the factorial of a number
+    fn factorial(n: &u8) -> BigUint {
+        match n {
+            0 => 0.to_biguint().unwrap(),
+            x => {
+                let mut x = x.to_biguint().unwrap();
+                let n = n.to_owned() as u128;
+                for i in 1..n {
+                    x *= i;
+                }
+                x
             }
         }
     }
-    game_numbers.sort();
-    game_numbers
 }
