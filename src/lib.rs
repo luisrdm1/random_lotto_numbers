@@ -65,13 +65,6 @@ impl Parameters {
 /// Function that receives a user input and expects to make a unsigned/signed integer
 /// Uses the FromStr Trait to provide that.
 ///
-/// ```
-/// use random_lotto_numbers as rln;
-///
-/// let input = rln::input_into_number::<u8>(&" 7".trim());
-///
-/// assert_eq!(7, input);
-/// ```
 pub fn input_into_number<T: FromStr>(string: &str) -> T {
     loop {
         println!("{string}");

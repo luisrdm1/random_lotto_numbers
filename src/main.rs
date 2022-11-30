@@ -1,4 +1,5 @@
 use random_lotto_numbers as rln;
+use colored::*;
 
 fn main() {
     loop {
@@ -9,7 +10,7 @@ fn main() {
 
         let games = match rln::input_into_number::<u16>(how_many_games) {
             0 => {
-                eprintln!("Ok. Aborting.");
+                eprintln!("{}", "Ok. Aborting.".red().bold());
                 break;
             }
             x => x,
@@ -22,7 +23,7 @@ fn main() {
         let end = rln::input_into_number::<u8>(&where_end);
 
         if end <= start {
-            eprintln!("We need at least two numbers. Aborting.");
+            eprintln!("{}","We need at least two numbers. Aborting.".bold().red());
             break;
         }
 
@@ -33,12 +34,12 @@ fn main() {
 
         let pick = match rln::input_into_number::<u8>(&how_many_pick) {
             0 => {
-                eprintln!("Picking zero numbers won't help you. Aborting.");
+                eprintln!("{}", "Picking zero numbers won't help you. Aborting.".red().bold());
                 break;
             }
             x => {
                 if x > (end - start) {
-                    eprintln!("You can't pick more numbers than you have!");
+                    eprintln!("{}", "You can't pick more numbers than you have!".bold().red());
                     break;
                 } else {
                     x
