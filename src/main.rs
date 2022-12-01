@@ -53,6 +53,7 @@ fn main() {
             let random_numbers = rln::Parameters::generate_game(&parameters);
 
             for num in random_numbers {
+                let num = num.to_string().bright_green();
                 print!("{} ", num);
             }
             println!();
