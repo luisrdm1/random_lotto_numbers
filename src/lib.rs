@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct Parameters {
-    pub games: u16,
+    pub games: usize,
     numbers_start: u8,
     numbers_end: u8,
     pick: u8,
@@ -12,7 +12,7 @@ pub struct Parameters {
 
 impl Parameters {
     ///
-    pub fn new(g: u16, ns: u8, ne: u8, pick: u8) -> Self {
+    pub fn new(g: usize, ns: u8, ne: u8, pick: u8) -> Self {
         Parameters {
             games: g,
             numbers_start: ns,

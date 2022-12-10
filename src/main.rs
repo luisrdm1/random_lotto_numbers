@@ -8,7 +8,7 @@ fn main() {
         let how_many_games = "How many games would you like? (≥ 1; if 0, abort)";
         let where_start = "Which number to start? (≥ 0)";
 
-        let games = match rln::input_into_number::<u16>(how_many_games) {
+        let games = match rln::input_into_number::<usize>(how_many_games) {
             0 => {
                 eprintln!("{}", "Ok. Aborting.".red().bold());
                 break;
@@ -53,14 +53,20 @@ fn main() {
             let random_numbers = rln::Parameters::generate_game(&parameters);
 
             for num in random_numbers {
-                let num = num.to_string().bright_green();
-                print!("{} ", num);
+                let color_num = num.to_string().bright_green();
+                if num < 10{
+                    let zero = 0.to_string().bright_green();
+                    print!("{zero}{color_num} ");
+                } else {
+                    print!("{color_num} ");
+                }
+                
             }
             println!();
             count += 1;
         }
         println!(
-            "This kind of game has {} possibilities.",
+            "This kind of game has {} possibilities.\n",
             rln::probability::combinations(end - start + 1, pick)
         );
     }
