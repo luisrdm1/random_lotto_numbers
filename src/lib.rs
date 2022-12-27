@@ -1,23 +1,51 @@
+use colored::Colorize;
 use rand::Rng;
-use std::io;
 use std::str::FromStr;
+use std::{io, process};
 
 #[derive(Debug)]
 pub struct Parameters {
     pub games: usize,
-    numbers_start: u8,
-    numbers_end: u8,
+    start: u8,
+    end: u8,
     pick: u8,
 }
 
 impl Parameters {
     ///
-    pub fn new(g: usize, ns: u8, ne: u8, pick: u8) -> Self {
+    pub fn new(games: usize, start: u8, end: u8, pick: u8) -> Self {
         Parameters {
-            games: g,
-            numbers_start: ns,
-            numbers_end: ne,
+            games,
+            start,
+            end,
             pick,
+        }
+    }
+
+    pub fn validate(&self) {
+        if let 0 = self.games {
+            eprintln!("{}", "Ok. Aborting.".red().bold());
+            process::exit(1);
+        }
+        if let true = self.end <= self.start {
+            eprintln!("{}", "We need at least two numbers. Aborting.".bold().red());
+            process::exit(1);
+        }
+        if let 0 = self.pick {
+            eprintln!(
+                "{}",
+                "Picking zero numbers won't help you. Aborting."
+                    .red()
+                    .bold()
+            );
+            process::exit(1);
+        }
+        if self.pick > (self.end - self.start) {
+            eprintln!(
+                "{}",
+                "You can't pick more numbers than you have!".bold().red()
+            );
+            process::exit(1);
         }
     }
 
@@ -36,7 +64,7 @@ impl Parameters {
     /// assert_eq!(10 as usize, gen.len());
     /// ```
     pub fn generate_game(&self) -> Vec<u8> {
-        let mut games: Vec<u8> = (self.numbers_start..=self.numbers_end).collect();
+        let mut games: Vec<u8> = (self.start..=self.end).collect();
 
         let not_pick = games.len() - self.pick as usize;
 
@@ -49,7 +77,7 @@ impl Parameters {
         } else {
             games.clear();
             while games.len() < self.pick as usize {
-                let random = rand::thread_rng().gen_range(self.numbers_start..=self.numbers_end);
+                let random = rand::thread_rng().gen_range(self.start..=self.end);
                 if games.contains(&random) {
                     continue;
                 } else {
@@ -79,6 +107,29 @@ pub fn input_into_number<T: FromStr>(string: &str) -> T {
                 continue;
             }
         };
+    }
+}
+
+pub fn run(parameters: Parameters) {
+    loop {
+        let mut count = 0;
+
+        while count < parameters.games {
+            let random_numbers = Parameters::generate_game(&parameters);
+
+            for num in random_numbers {
+                let color_num = num.to_string().bright_green();
+                if num < 10 {
+                    let zero = 0.to_string().bright_green();
+                    print!("{zero}{color_num} ");
+                } else {
+                    print!("{color_num} ");
+                }
+            }
+            println!();
+            count += 1;
+        }
+        break;
     }
 }
 
