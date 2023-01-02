@@ -1,18 +1,20 @@
 use colored::Colorize;
+use num_bigint::ToBigUint;
 use rand::Rng;
+use std::collections::HashSet;
+use std::mem::swap;
 use std::str::FromStr;
 use std::{io, process};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Parameters {
-    pub games: usize,
+    games: usize,
     start: u8,
     end: u8,
     pick: u8,
 }
 
 impl Parameters {
-    ///
     pub fn new(games: usize, start: u8, end: u8, pick: u8) -> Self {
         Parameters {
             games,
@@ -20,33 +22,44 @@ impl Parameters {
             end,
             pick,
         }
+        .validate()
     }
 
-    pub fn validate(&self) {
-        if let 0 = self.games {
-            eprintln!("{}", "Ok. Aborting.".red().bold());
-            process::exit(1);
+    pub fn validate(&mut self) -> Self {
+        if self.end < self.start {
+            swap(&mut self.start, &mut self.end);
         }
-        if let true = self.end <= self.start {
-            eprintln!("{}", "We need at least two numbers. Aborting.".bold().red());
-            process::exit(1);
-        }
-        if let 0 = self.pick {
+        let len = self.end + 1 - self.start;
+        if len < 2 {
             eprintln!(
                 "{}",
-                "Picking zero numbers won't help you. Aborting."
+                "You need at least two numbers to have some randomness. Aborting."
                     .red()
                     .bold()
             );
             process::exit(1);
         }
-        if self.pick > (self.end - self.start) {
+        if self.games == 0 {
+            eprintln!("{}", "Ok. Aborting.".red().bold());
+            process::exit(1);
+        }
+        if self.pick == 0 {
+            eprintln!(
+                "{}",
+                "Picking zero numbers won't help you! Aborting."
+                    .red()
+                    .bold()
+            );
+            process::exit(1);
+        }
+        if self.pick > len {
             eprintln!(
                 "{}",
                 "You can't pick more numbers than you have!".bold().red()
             );
             process::exit(1);
         }
+        *self
     }
 
     /// Function that receives the max number and the pick value
@@ -63,30 +76,30 @@ impl Parameters {
     ///
     /// assert_eq!(10 as usize, gen.len());
     /// ```
-    pub fn generate_game(&self) -> Vec<u8> {
-        let mut games: Vec<u8> = (self.start..=self.end).collect();
+    pub fn generate_ticket(&self) -> Vec<u8> {
+        let mut game: Vec<u8> = (self.start..=self.end).collect();
 
-        let not_pick = games.len() - self.pick as usize;
+        let not_pick = game.len() - self.pick as usize;
 
         if self.pick as usize >= not_pick {
             let mut count = 0;
             while count < not_pick {
-                games.remove(rand::thread_rng().gen_range(0..games.len()));
+                game.remove(rand::thread_rng().gen_range(0..game.len()));
                 count += 1;
             }
         } else {
-            games.clear();
-            while games.len() < self.pick as usize {
+            game.clear();
+            while game.len() != self.pick as usize {
                 let random = rand::thread_rng().gen_range(self.start..=self.end);
-                if games.contains(&random) {
+                if game.contains(&random) {
                     continue;
                 } else {
-                    games.push(random)
+                    game.push(random)
                 }
             }
         }
-        games.sort();
-        games
+        game.sort();
+        game
     }
 }
 
@@ -110,43 +123,65 @@ pub fn input_into_number<T: FromStr>(string: &str) -> T {
     }
 }
 
-pub fn run(parameters: Parameters) {
-    loop {
-        let mut count = 0;
+pub fn bundle(parameters: Parameters) -> HashSet<Vec<u8>> {
+    let mut bundle = HashSet::new();
 
-        while count < parameters.games {
-            let random_numbers = Parameters::generate_game(&parameters);
+    let choice_len = parameters.end + 1 - parameters.start;
+    let possible_combinations = probability::combinations(choice_len, parameters.pick);
 
-            for num in random_numbers {
-                let color_num = num.to_string().bright_green();
-                if num < 10 {
-                    let zero = 0.to_string().bright_green();
-                    print!("{zero}{color_num} ");
-                } else {
-                    print!("{color_num} ");
-                }
-            }
-            println!();
-            count += 1;
+    while bundle.len() != parameters.games {
+        let random_ticket = parameters.generate_ticket();
+
+        let inserted = bundle.insert(random_ticket);
+
+        if !inserted
+            && bundle.len().to_biguint().unwrap() == possible_combinations
+        {
+            eprintln!(
+                "{}",
+                "Unable to generate the requested number of games."
+                    .red()
+                    .bold()
+            );
+            break;
         }
-        break;
     }
+
+    bundle
 }
 
 pub mod probability {
+    use crate::Parameters;
     use num_bigint::{BigUint, ToBigUint};
 
-    /// Calculates Permutation of (n, r) as
-    ///
-    ///
-    pub fn combinations(n: u8, r: u8) -> BigUint {
-        factorial(&n) / (factorial(&r) * factorial(&(n - r)))
+    /// N - number of ball in lottery
+    /// K - number of balls in a single ticket
+    /// B - number of matching balls for a winning ticket
+    pub fn odds(parameters: Parameters, b: u8) -> (BigUint, BigUint) {
+        let n = parameters.end - parameters.start + 1;
+        let k = parameters.pick;
+        if k > b {
+            return (
+                combinations(k, b) * combinations(n - k, k - b),
+                combinations(n, k),
+            );
+        } else {
+            return (
+                combinations(k, b) * combinations(n - k, k - b),
+                combinations(n, k),
+            );
+        }
+    }
+
+    /// Calculates the combinations of (n, r)
+    pub fn combinations(n: u8, k: u8) -> BigUint {
+        factorial(&n) / (factorial(&k) * factorial(&(n - k)))
     }
 
     /// Generates the factorial of a number
     fn factorial(n: &u8) -> BigUint {
         match n {
-            0 => 0.to_biguint().unwrap(),
+            0 => 1.to_biguint().unwrap(),
             x => {
                 let mut x = x.to_biguint().unwrap();
                 let n = n.to_owned() as u128;
