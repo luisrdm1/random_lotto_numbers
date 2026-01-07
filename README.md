@@ -18,6 +18,47 @@ cargo run -- -t 5 -s 1 -e 60 -p 6
 cargo run -- -t 3 -s 1 -e 60 -p 6 -m 6
 ```
 
+## 🎰 Exemplos de Uso
+
+### Loterias Brasileiras
+
+```bash
+# Mega-Sena (6 números de 1 a 60)
+cargo run -- -t 10 -s 1 -e 60 -p 6
+
+# Quina (5 números de 1 a 80)
+cargo run -- -t 10 -s 1 -e 80 -p 5
+
+# Lotofácil (15 números de 1 a 25)
+cargo run -- -t 5 -s 1 -e 25 -p 15
+
+# Lotomania (50 números de 0 a 99)
+cargo run -- -t 3 -s 0 -e 99 -p 50
+
+# Dupla Sena (6 números de 1 a 50, gerar 2 jogos)
+cargo run -- -t 2 -s 1 -e 50 -p 6
+```
+
+### Com Cálculo de Probabilidade
+
+```bash
+# Mega-Sena: probabilidade de acertar a sena (6 números)
+cargo run -- -t 1 -s 1 -e 60 -p 6 -m 6
+
+# Mega-Sena: probabilidade de acertar a quina (5 números)
+cargo run -- -t 1 -s 1 -e 60 -p 6 -m 5
+
+# Lotofácil: probabilidade de acertar 15 pontos
+cargo run -- -t 1 -s 1 -e 25 -p 15 -m 15
+```
+
+### Ajuda
+
+```bash
+# Ver todas as opções disponíveis
+cargo run -- --help
+```
+
 ## 📦 Como Biblioteca
 
 ```rust
