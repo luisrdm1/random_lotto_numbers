@@ -1,195 +1,207 @@
-use colored::Colorize;
-use num_bigint::ToBigUint;
-use rand::Rng;
-use std::collections::HashSet;
-use std::mem::swap;
-use std::str::FromStr;
-use std::{io, process};
+//! Lotto Quick Pick - A library for generating lottery tickets.
+//!
+//! This library provides functionality to generate unique lottery tickets
+//! with configurable parameters and calculate winning probabilities.
+//!
+//! # Features
+//!
+//! - Type-safe configuration using newtypes
+//! - Pluggable random number generators
+//! - Efficient ticket generation (uses optimal strategy based on pick size)
+//! - Probability calculation without factorial (no overflow for practical lotteries)
+//! - Comprehensive error handling
+//!
+//! # Examples
+//!
+//! ```
+//! use lotto_quick_pick::{Config, generate_tickets};
+//! use rand::rng;
+//!
+//! let config = Config::new(10, 1, 60, 6).unwrap();
+//! let mut rng = rand::rng();
+//! let tickets = generate_tickets(&mut rng, &config).unwrap();
+//!
+//! assert_eq!(tickets.len(), 10);
+//! ```
 
-#[derive(Debug, Clone, Copy)]
-pub struct Parameters {
-    games: usize,
-    start: u8,
-    end: u8,
-    pick: u8,
-}
+pub mod error;
+pub mod newtypes;
+pub mod probability;
+pub mod rng;
+pub mod ticket_bitwise;
+pub mod ticket;
 
-impl Parameters {
-    pub fn new(games: usize, start: u8, end: u8, pick: u8) -> Self {
-        Parameters {
-            games,
-            start,
-            end,
-            pick,
-        }
-        .validate()
-    }
+pub use error::{LottoError, Result};
+pub use newtypes::{BallNumber, BallRange, GameCount, PickCount, Ticket};
+pub use probability::{calculate_probability, combination};
+pub use rng::RandomNumberGenerator;
+pub use ticket::{generate_ticket, generate_unique_tickets};
 
-    pub fn validate(&mut self) -> Self {
-        if self.end < self.start {
-            swap(&mut self.start, &mut self.end);
-        }
-        let len = self.end + 1 - self.start;
-        if len < 2 {
-            eprintln!(
-                "{}",
-                "You need at least two numbers to have some randomness. Aborting."
-                    .red()
-                    .bold()
-            );
-            process::exit(1);
-        }
-        if self.games == 0 {
-            eprintln!("{}", "Ok. Aborting.".red().bold());
-            process::exit(1);
-        }
-        if self.pick == 0 {
-            eprintln!(
-                "{}",
-                "Picking zero numbers won't help you! Aborting."
-                    .red()
-                    .bold()
-            );
-            process::exit(1);
-        }
-        if self.pick > len {
-            eprintln!(
-                "{}",
-                "You can't pick more numbers than you have!".bold().red()
-            );
-            process::exit(1);
-        }
-        *self
-    }
-
-    /// Function that receives the max number and the pick value
-    /// to generete random numbers.
-    ///
-    /// Example:
-    /// From 18 numbers, we want to pick 10.
-    /// ```
-    /// use random_lotto_numbers as rln;
-    ///
-    /// let param = rln::Parameters::new(1, 1, 18, 10);
-    ///
-    /// let gen = param.generate_game();
-    ///
-    /// assert_eq!(10 as usize, gen.len());
-    /// ```
-    pub fn generate_ticket(&self) -> Vec<u8> {
-        let mut game: Vec<u8> = (self.start..=self.end).collect();
-
-        let not_pick = game.len() - self.pick as usize;
-
-        if self.pick as usize >= not_pick {
-            let mut count = 0;
-            while count < not_pick {
-                game.remove(rand::thread_rng().gen_range(0..game.len()));
-                count += 1;
-            }
-        } else {
-            game.clear();
-            while game.len() != self.pick as usize {
-                let random = rand::thread_rng().gen_range(self.start..=self.end);
-                if game.contains(&random) {
-                    continue;
-                } else {
-                    game.push(random)
-                }
-            }
-        }
-        game.sort();
-        game
-    }
-}
-
-/// Function that receives a user input and expects to make a unsigned/signed integer
-/// Uses the FromStr Trait to provide that.
+/// Configuration for lottery ticket generation.
 ///
-pub fn input_into_number<T: FromStr>(string: &str) -> T {
-    loop {
-        println!("{string}");
-        let mut value = String::new();
-        io::stdin()
-            .read_line(&mut value)
-            .expect("Failed to read line.");
-        match value.trim().parse() {
-            Ok(num) => return num,
-            Err(_) => {
-                eprintln!("This is not a valid value. Please try again.");
-                continue;
-            }
-        };
-    }
+/// This struct holds all necessary parameters for generating lottery tickets
+/// in a type-safe manner.
+#[derive(Debug, Clone)]
+pub struct Config {
+    game_count: GameCount,
+    range: BallRange,
+    pick: PickCount,
 }
 
-pub fn bundle(parameters: Parameters) -> HashSet<Vec<u8>> {
-    let mut bundle = HashSet::new();
-
-    let choice_len = parameters.end + 1 - parameters.start;
-    let possible_combinations = probability::combinations(choice_len, parameters.pick);
-
-    while bundle.len() != parameters.games {
-        let random_ticket = parameters.generate_ticket();
-
-        let inserted = bundle.insert(random_ticket);
-
-        if !inserted
-            && bundle.len().to_biguint().unwrap() == possible_combinations
-        {
-            eprintln!(
-                "{}",
-                "Unable to generate the requested number of games."
-                    .red()
-                    .bold()
-            );
-            break;
-        }
-    }
-
-    bundle
-}
-
-pub mod probability {
-    use crate::Parameters;
-    use num_bigint::{BigUint, ToBigUint};
-
-    /// N - number of ball in lottery
-    /// K - number of balls in a single ticket
-    /// B - number of matching balls for a winning ticket
-    pub fn odds(parameters: Parameters, b: u8) -> (BigUint, BigUint) {
-        let n = parameters.end - parameters.start + 1;
-        let k = parameters.pick;
-        if k > b {
-            return (
-                combinations(k, b) * combinations(n - k, k - b),
-                combinations(n, k),
-            );
+impl Config {
+    /// Create a new Config from raw values.
+    ///
+    /// # Arguments
+    ///
+    /// * `games` - Number of unique tickets to generate
+    /// * `start` - Starting ball number (inclusive)
+    /// * `end` - Ending ball number (inclusive)
+    /// * `pick` - Number of balls to pick per ticket
+    ///
+    /// # Returns
+    ///
+    /// A Config if all parameters are valid, otherwise a LottoError.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use lotto_quick_pick::Config;
+    ///
+    /// // Mega-Sena configuration: 6 from 60, generate 10 tickets
+    /// let config = Config::new(10, 1, 60, 6).unwrap();
+    /// ```
+    pub fn new(games: usize, start: u8, end: u8, pick: usize) -> Result<Self> {
+        let game_count = GameCount::new(games)?;
+        
+        // Ensure start <= end by swapping if necessary
+        let (start, end) = if start <= end {
+            (start, end)
         } else {
-            return (
-                combinations(k, b) * combinations(n - k, k - b),
-                combinations(n, k),
-            );
-        }
+            (end, start)
+        };
+        
+        let range = BallRange::new(BallNumber::new(start), BallNumber::new(end))?;
+        let pick_count = PickCount::new(pick, &range)?;
+
+        Ok(Self {
+            game_count,
+            range,
+            pick: pick_count,
+        })
     }
 
-    /// Calculates the combinations of (n, r)
-    pub fn combinations(n: u8, k: u8) -> BigUint {
-        factorial(&n) / (factorial(&k) * factorial(&(n - k)))
+    /// Get the number of games to generate.
+    pub fn game_count(&self) -> &GameCount {
+        &self.game_count
     }
 
-    /// Generates the factorial of a number
-    fn factorial(n: &u8) -> BigUint {
-        match n {
-            0 => 1.to_biguint().unwrap(),
-            x => {
-                let mut x = x.to_biguint().unwrap();
-                let n = n.to_owned() as u128;
-                for i in 1..n {
-                    x *= i;
-                }
-                x
-            }
-        }
+    /// Get the ball range.
+    pub fn range(&self) -> &BallRange {
+        &self.range
+    }
+
+    /// Get the pick count.
+    pub fn pick(&self) -> &PickCount {
+        &self.pick
+    }
+}
+
+/// Generate lottery tickets using the provided configuration.
+///
+/// This is a convenience function that uses the configuration to generate
+/// unique lottery tickets.
+///
+/// # Arguments
+///
+/// * `rng` - Random number generator
+/// * `config` - Lottery configuration
+///
+/// # Returns
+///
+/// A Result containing a vector of unique tickets, or an error.
+///
+/// # Examples
+///
+/// ```
+/// use lotto_quick_pick::{Config, generate_tickets};
+/// use rand::rng;
+///
+/// let config = Config::new(5, 1, 60, 6).unwrap();
+/// let mut rng = rand::rng();
+/// let tickets = generate_tickets(&mut rng, &config).unwrap();
+///
+/// assert_eq!(tickets.len(), 5);
+/// ```
+pub fn generate_tickets<R: RandomNumberGenerator>(
+    rng: &mut R,
+    config: &Config,
+) -> Result<Vec<Ticket>> {
+    generate_unique_tickets(rng, config.range(), config.pick(), config.game_count())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_config_new_valid() {
+        let config = Config::new(10, 1, 60, 6).unwrap();
+        assert_eq!(config.game_count().value(), 10);
+        assert_eq!(config.range().start().value(), 1);
+        assert_eq!(config.range().end().value(), 60);
+        assert_eq!(config.pick().value(), 6);
+    }
+
+    #[test]
+    fn test_config_new_swaps_start_end() {
+        let config = Config::new(1, 60, 1, 6).unwrap();
+        assert_eq!(config.range().start().value(), 1);
+        assert_eq!(config.range().end().value(), 60);
+    }
+
+    #[test]
+    fn test_config_new_invalid_zero_games() {
+        let result = Config::new(0, 1, 60, 6);
+        assert!(matches!(result, Err(LottoError::ZeroGames)));
+    }
+
+    #[test]
+    fn test_config_new_invalid_pick_exceeds_range() {
+        let result = Config::new(1, 1, 10, 15);
+        assert!(matches!(result, Err(LottoError::PickExceedsRange { .. })));
+    }
+
+    #[test]
+    fn test_config_new_invalid_equal_start_end() {
+        let result = Config::new(1, 10, 10, 1);
+        assert!(matches!(result, Err(LottoError::InvalidRange { .. })));
+    }
+
+    #[test]
+    fn test_generate_tickets_returns_correct_count() {
+        let mut rng = rand::rng();
+        let config = Config::new(5, 1, 60, 6).unwrap();
+        let tickets = generate_tickets(&mut rng, &config).unwrap();
+        assert_eq!(tickets.len(), 5);
+    }
+
+    #[test]
+    fn test_generate_tickets_all_unique() {
+        let mut rng = rand::rng();
+        let config = Config::new(10, 1, 60, 6).unwrap();
+        let tickets = generate_tickets(&mut rng, &config).unwrap();
+        
+        use std::collections::HashSet;
+        let unique_tickets: HashSet<_> = tickets.iter().collect();
+        assert_eq!(unique_tickets.len(), 10);
+    }
+
+    #[test]
+    fn test_generate_tickets_too_many() {
+        let mut rng = rand::rng();
+        let config = Config::new(11, 1, 5, 3).unwrap();
+        // C(5,3) = 10, so requesting 11 should fail
+        let result = generate_tickets(&mut rng, &config);
+        assert!(matches!(result, Err(LottoError::TooManyUniqueGames { .. })));
     }
 }
