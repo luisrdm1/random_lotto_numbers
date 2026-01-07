@@ -89,12 +89,11 @@ impl RandomNumberGenerator for MyRng {
 
 Algoritmo iterativo sem fatorial (sem BigInt):
 
-```
-C(n,k) = ∏(n-i+1)/i para i=1..k
-```
+$$C(n,k) = \prod_{i=1}^{k} \frac{n-i+1}{i}$$
 
-- C(60,6) = 50.063.860 (Mega-Sena)
-- C(100,50) calculado sem overflow usando u128
+Exemplos:
+- $C(60,6) = 50.063.860$ (Mega-Sena)
+- $C(100,50)$ calculado sem overflow usando `u128`
 
 ## 📄 Licença
 
