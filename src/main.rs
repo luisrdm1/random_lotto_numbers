@@ -1,6 +1,8 @@
 use clap::Parser;
 use colored::Colorize;
-use lotto_quick_pick::{self as lqp, Config, calculate_probability, generate_tickets};
+use lotto_quick_pick::{
+    self as lqp, Config, generate_tickets, probability::calculate_probability_for_config,
+};
 use rand::rng;
 
 /// Command-line lottery ticket generator.
@@ -68,9 +70,7 @@ fn main() {
 
     // Display probability if requested
     if let Some(matched_balls) = cli.matched {
-        let total_balls = (cli.end_number - cli.start_number + 1) as usize;
-
-        match calculate_probability(total_balls, cli.pick, matched_balls) {
+        match calculate_probability_for_config(&config, matched_balls) {
             Ok((favorable, total)) => {
                 // Simplify the fraction if possible
                 let gcd = gcd_u128(favorable, total);

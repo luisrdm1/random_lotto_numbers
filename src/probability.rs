@@ -130,6 +130,37 @@ pub fn calculate_probability(
     Ok((favorable_outcomes, total_outcomes))
 }
 
+/// Calculate probability using Config object.
+///
+/// This is a convenience function that extracts the necessary values
+/// from a Config object to calculate probability, ensuring consistency
+/// between ticket generation and probability calculation.
+///
+/// # Arguments
+///
+/// * `config` - Configuration containing validated range and pick count
+/// * `match_count` - Number of balls to match
+///
+/// # Returns
+///
+/// A tuple of (favorable_outcomes, total_outcomes) or an error
+///
+/// # Examples
+///
+/// ```
+/// use lotto_quick_pick::{Config, probability::calculate_probability_for_config};
+///
+/// let config = Config::new(1, 1, 60, 6).unwrap();
+/// let (favorable, total) = calculate_probability_for_config(&config, 6).unwrap();
+/// assert_eq!(total, 50_063_860); // Mega-Sena total combinations
+/// ```
+pub fn calculate_probability_for_config(
+    config: &crate::Config,
+    match_count: usize,
+) -> Result<(u128, u128)> {
+    calculate_probability(config.range().size(), config.pick().value(), match_count)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,5 +231,27 @@ mod tests {
         let (favorable, total) = calculate_probability(10, 3, 2).unwrap();
         assert_eq!(total, 120); // C(10, 3)
         assert_eq!(favorable, 21); // C(3, 2) * C(7, 1) = 3 * 7
+    }
+
+    #[test]
+    fn test_calculate_probability_for_config_mega_sena() {
+        let config = crate::Config::new(1, 1, 60, 6).unwrap();
+        let (_favorable, total) = calculate_probability_for_config(&config, 6).unwrap();
+        assert_eq!(total, 50_063_860);
+    }
+
+    #[test]
+    fn test_calculate_probability_for_config_with_swapped_range() {
+        // Config should normalize start/end, so 60,1 becomes 1,60
+        let config = crate::Config::new(1, 60, 1, 6).unwrap();
+        let (_favorable, total) = calculate_probability_for_config(&config, 6).unwrap();
+        assert_eq!(total, 50_063_860); // Same as normal order
+    }
+
+    #[test]
+    fn test_calculate_probability_for_config_invalid_match() {
+        let config = crate::Config::new(1, 1, 60, 6).unwrap();
+        let result = calculate_probability_for_config(&config, 7);
+        assert!(matches!(result, Err(LottoError::InvalidMatchCount { .. })));
     }
 }
