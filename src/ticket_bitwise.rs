@@ -72,10 +72,10 @@ impl BitwiseStrategy {
 /// # Returns
 ///
 /// A vector of unique ball numbers or an error
-pub fn generate_ticket_u64_bitmap(
+pub fn generate_ticket_u64_bitmap<R: RandomNumberGenerator>(
     range: &BallRange,
     count: PickCount,
-    rng: &mut dyn RandomNumberGenerator,
+    rng: &mut R,
 ) -> Result<Vec<BallNumber>, LottoError> {
     let min = range.start().value();
     let max = range.end().value();
@@ -124,10 +124,10 @@ pub fn generate_ticket_u64_bitmap(
 /// # Returns
 ///
 /// A vector of unique ball numbers or an error
-pub fn generate_ticket_u128_bitmap(
+pub fn generate_ticket_u128_bitmap<R: RandomNumberGenerator>(
     range: &BallRange,
     count: PickCount,
-    rng: &mut dyn RandomNumberGenerator,
+    rng: &mut R,
 ) -> Result<Vec<BallNumber>, LottoError> {
     let min = range.start().value();
     let max = range.end().value();
@@ -176,10 +176,10 @@ pub fn generate_ticket_u128_bitmap(
 /// # Returns
 ///
 /// A vector of unique ball numbers or an error
-pub fn generate_ticket_vec_bitmap(
+pub fn generate_ticket_vec_bitmap<R: RandomNumberGenerator>(
     range: &BallRange,
     count: PickCount,
-    rng: &mut dyn RandomNumberGenerator,
+    rng: &mut R,
 ) -> Result<Vec<BallNumber>, LottoError> {
     let min = range.start().value();
     let max = range.end().value();
@@ -240,10 +240,10 @@ pub fn generate_ticket_vec_bitmap(
 /// let ticket = generate_ticket_bitwise(&range, count, &mut rng).unwrap();
 /// assert_eq!(ticket.len(), 6);
 /// ```
-pub fn generate_ticket_bitwise(
+pub fn generate_ticket_bitwise<R: RandomNumberGenerator>(
     range: &BallRange,
     count: PickCount,
-    rng: &mut dyn RandomNumberGenerator,
+    rng: &mut R,
 ) -> Result<Vec<BallNumber>, LottoError> {
     let strategy = BitwiseStrategy::select(range)?;
 
@@ -252,29 +252,6 @@ pub fn generate_ticket_bitwise(
         BitwiseStrategy::U128 => generate_ticket_u128_bitmap(range, count, rng),
         BitwiseStrategy::VecU64 => generate_ticket_vec_bitmap(range, count, rng),
     }
-}
-
-/// Generates a lottery ticket using bitwise operations with generic RNG.
-///
-/// This is a convenience wrapper that works with any type implementing
-/// the `RandomNumberGenerator` trait, making it compatible with the main
-/// ticket generation system.
-///
-/// # Arguments
-///
-/// * `range` - The range of ball numbers
-/// * `count` - Number of balls to pick
-/// * `rng` - Any random number generator implementing RandomNumberGenerator
-///
-/// # Returns
-///
-/// A vector of unique ball numbers or an error
-pub fn generate_ticket_bitwise_generic<R: RandomNumberGenerator>(
-    range: &BallRange,
-    count: PickCount,
-    rng: &mut R,
-) -> Result<Vec<BallNumber>, LottoError> {
-    generate_ticket_bitwise(range, count, rng)
 }
 
 #[cfg(test)]

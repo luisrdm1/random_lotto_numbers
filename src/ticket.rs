@@ -5,7 +5,7 @@
 
 use crate::newtypes::{BallNumber, BallRange, GameCount, PickCount, Ticket};
 use crate::rng::RandomNumberGenerator;
-use crate::ticket_bitwise::generate_ticket_bitwise_generic;
+use crate::ticket_bitwise::generate_ticket_bitwise;
 use std::collections::HashSet;
 
 /// Generate a single lottery ticket with unique random ball numbers.
@@ -40,7 +40,7 @@ pub fn generate_ticket<R: RandomNumberGenerator>(
     pick: &PickCount,
 ) -> Ticket {
     // Try bitwise strategy first (fastest, 55-67% performance improvement)
-    if let Ok(balls) = generate_ticket_bitwise_generic(range, *pick, rng) {
+    if let Ok(balls) = generate_ticket_bitwise(range, *pick, rng) {
         return Ticket::new(balls);
     }
 
