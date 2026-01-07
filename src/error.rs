@@ -41,6 +41,18 @@ pub enum LottoError {
     )]
     UniqueGenerationFailed { requested: usize, generated: usize },
 
+    /// Ticket has wrong number of balls.
+    #[error("Ticket must have exactly {expected} balls, but got {got}")]
+    InvalidTicketSize { expected: usize, got: usize },
+
+    /// Ball number is outside valid range.
+    #[error("Ball number {value} is outside range {start}..={end}")]
+    BallOutOfRange { value: u8, start: u8, end: u8 },
+
+    /// Ticket contains duplicate ball numbers.
+    #[error("Ticket contains duplicate ball: {value}")]
+    DuplicateBall { value: u8 },
+
     /// Input/output error during user interaction.
     #[error("I/O error: {0}")]
     IoError(String),

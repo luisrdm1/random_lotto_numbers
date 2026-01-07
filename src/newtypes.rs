@@ -216,6 +216,81 @@ impl Ticket {
         Self { balls }
     }
 
+    /// Create a new validated Ticket.
+    ///
+    /// This constructor validates that:
+    /// - The ticket has exactly `pick.value()` balls
+    /// - All balls are within the specified range
+    /// - All balls are unique (no duplicates)
+    ///
+    /// # Arguments
+    ///
+    /// * `balls` - Vector of ball numbers (will be sorted)
+    /// * `range` - The valid range for ball numbers
+    /// * `pick` - The expected number of balls
+    ///
+    /// # Returns
+    ///
+    /// A validated Ticket or an error if validation fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use lotto_quick_pick::newtypes::{Ticket, BallNumber, BallRange, PickCount};
+    ///
+    /// let range = BallRange::mega_sena();
+    /// let pick = PickCount::new(6, &range).unwrap();
+    /// let balls = vec![
+    ///     BallNumber::new(5),
+    ///     BallNumber::new(10),
+    ///     BallNumber::new(15),
+    ///     BallNumber::new(20),
+    ///     BallNumber::new(25),
+    ///     BallNumber::new(30),
+    /// ];
+    ///
+    /// let ticket = Ticket::try_new(balls, &range, &pick).unwrap();
+    /// assert_eq!(ticket.balls().len(), 6);
+    /// ```
+    pub fn try_new(
+        mut balls: Vec<BallNumber>,
+        range: &BallRange,
+        pick: &PickCount,
+    ) -> crate::error::Result<Self> {
+        use crate::error::LottoError;
+
+        // Validate size
+        if balls.len() != pick.value() {
+            return Err(LottoError::InvalidTicketSize {
+                expected: pick.value(),
+                got: balls.len(),
+            });
+        }
+
+        // Validate all balls are in range
+        for &ball in &balls {
+            if !range.contains(ball) {
+                return Err(LottoError::BallOutOfRange {
+                    value: ball.value(),
+                    start: range.start().value(),
+                    end: range.end().value(),
+                });
+            }
+        }
+
+        // Sort and check for duplicates
+        balls.sort_unstable();
+        for window in balls.windows(2) {
+            if window[0] == window[1] {
+                return Err(LottoError::DuplicateBall {
+                    value: window[0].value(),
+                });
+            }
+        }
+
+        Ok(Self { balls })
+    }
+
     /// Get a reference to the ball numbers.
     pub fn balls(&self) -> &[BallNumber] {
         &self.balls
@@ -485,5 +560,113 @@ mod tests {
         let ticket2 = Ticket::new(vec![BallNumber::new(10), BallNumber::new(5)]);
         // Should be equal even if created in different order
         assert_eq!(ticket1, ticket2);
+    }
+
+    #[test]
+    fn test_ticket_try_new_valid() {
+        let range = BallRange::mega_sena();
+        let pick = PickCount::new(6, &range).unwrap();
+        let balls = vec![
+            BallNumber::new(5),
+            BallNumber::new(10),
+            BallNumber::new(15),
+            BallNumber::new(20),
+            BallNumber::new(25),
+            BallNumber::new(30),
+        ];
+
+        let ticket = Ticket::try_new(balls, &range, &pick).unwrap();
+        assert_eq!(ticket.balls().len(), 6);
+        // Should be sorted
+        assert_eq!(ticket.balls()[0].value(), 5);
+        assert_eq!(ticket.balls()[5].value(), 30);
+    }
+
+    #[test]
+    fn test_ticket_try_new_valid_unordered() {
+        let range = BallRange::mega_sena();
+        let pick = PickCount::new(6, &range).unwrap();
+        let balls = vec![
+            BallNumber::new(30),
+            BallNumber::new(5),
+            BallNumber::new(20),
+            BallNumber::new(10),
+            BallNumber::new(25),
+            BallNumber::new(15),
+        ];
+
+        let ticket = Ticket::try_new(balls, &range, &pick).unwrap();
+        // Should be sorted after try_new
+        assert_eq!(ticket.balls()[0].value(), 5);
+        assert_eq!(ticket.balls()[5].value(), 30);
+    }
+
+    #[test]
+    fn test_ticket_try_new_duplicate_balls() {
+        use crate::error::LottoError;
+        let range = BallRange::mega_sena();
+        let pick = PickCount::new(6, &range).unwrap();
+        let balls = vec![
+            BallNumber::new(5),
+            BallNumber::new(10),
+            BallNumber::new(10), // Duplicate
+            BallNumber::new(20),
+            BallNumber::new(25),
+            BallNumber::new(30),
+        ];
+
+        let result = Ticket::try_new(balls, &range, &pick);
+        assert!(matches!(
+            result,
+            Err(LottoError::DuplicateBall { value: 10 })
+        ));
+    }
+
+    #[test]
+    fn test_ticket_try_new_ball_out_of_range() {
+        use crate::error::LottoError;
+        let range = BallRange::mega_sena(); // 1-60
+        let pick = PickCount::new(6, &range).unwrap();
+        let balls = vec![
+            BallNumber::new(5),
+            BallNumber::new(10),
+            BallNumber::new(15),
+            BallNumber::new(20),
+            BallNumber::new(25),
+            BallNumber::new(70), // Out of range
+        ];
+
+        let result = Ticket::try_new(balls, &range, &pick);
+        assert!(matches!(
+            result,
+            Err(LottoError::BallOutOfRange {
+                value: 70,
+                start: 1,
+                end: 60
+            })
+        ));
+    }
+
+    #[test]
+    fn test_ticket_try_new_wrong_size() {
+        use crate::error::LottoError;
+        let range = BallRange::mega_sena();
+        let pick = PickCount::new(6, &range).unwrap();
+        let balls = vec![
+            BallNumber::new(5),
+            BallNumber::new(10),
+            BallNumber::new(15),
+            BallNumber::new(20),
+            // Missing 2 balls
+        ];
+
+        let result = Ticket::try_new(balls, &range, &pick);
+        assert!(matches!(
+            result,
+            Err(LottoError::InvalidTicketSize {
+                expected: 6,
+                got: 4
+            })
+        ));
     }
 }
