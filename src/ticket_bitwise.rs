@@ -420,4 +420,84 @@ mod tests {
         let result = generate_ticket_u128_bitmap(&range, count, &mut rng);
         assert!(result.is_err());
     }
+
+    // ============================================================================
+    // Tests exposing bugs (Commit 1)
+    // ============================================================================
+
+    #[test]
+    fn test_bug_range_large_value_small_size() {
+        // Bug: Range 200..=255 has size 56, but end()=255
+        // Expected: BitwiseStrategy::U64 (because size=56 <= 64)
+        // Current (buggy): VecU64 (because end=255 > 128)
+        let range = BallRange::new(BallNumber::new(200), BallNumber::new(255)).unwrap();
+        assert_eq!(range.size(), 56);
+        
+        let strategy = BitwiseStrategy::select(&range).unwrap();
+        assert_eq!(strategy, BitwiseStrategy::U64, 
+            "Range 200-255 (size=56) should use U64, not {:?}", strategy);
+    }
+
+    #[test]
+    fn test_bug_range_0_to_64_should_not_be_u64() {
+        // Critical bug: Range 0..=64 has size 65
+        // Expected: U128 or VecU64 (because size=65 > 64, avoids 1u64 << 64)
+        // Current (buggy): U64 (because end=64 <= 64) → causes panic in shift
+        let range = BallRange::new(BallNumber::new(0), BallNumber::new(64)).unwrap();
+        assert_eq!(range.size(), 65);
+        
+        let strategy = BitwiseStrategy::select(&range).unwrap();
+        assert_ne!(strategy, BitwiseStrategy::U64,
+            "Range 0-64 (size=65) CANNOT use U64 (would cause shift overflow)");
+    }
+
+    #[test]
+    fn test_u64_precondition_validation_by_size() {
+        // Must reject range with size > 64, even if end <= 64
+        let range = BallRange::new(BallNumber::new(0), BallNumber::new(64)).unwrap();
+        assert_eq!(range.size(), 65);
+        
+        let count = PickCount::new(5, &range).unwrap();
+        let mut rng = rand::rng();
+
+        let result = generate_ticket_u64_bitmap(&range, count, &mut rng);
+        assert!(result.is_err(), 
+            "u64_bitmap must reject range with size=65 (> 64)");
+    }
+
+    #[test]
+    fn test_u128_precondition_validation_by_size() {
+        // Must reject range with size > 128, even if end <= 128
+        let range = BallRange::new(BallNumber::new(0), BallNumber::new(128)).unwrap();
+        assert_eq!(range.size(), 129);
+        
+        let count = PickCount::new(5, &range).unwrap();
+        let mut rng = rand::rng();
+
+        let result = generate_ticket_u128_bitmap(&range, count, &mut rng);
+        assert!(result.is_err(),
+            "u128_bitmap must reject range with size=129 (> 128)");
+    }
+
+    #[test]
+    fn test_range_1_to_64_should_use_u64() {
+        // Valid case: Range 1..=64 has size 64 (OK for U64)
+        let range = BallRange::new(BallNumber::new(1), BallNumber::new(64)).unwrap();
+        assert_eq!(range.size(), 64);
+        
+        let strategy = BitwiseStrategy::select(&range).unwrap();
+        assert_eq!(strategy, BitwiseStrategy::U64,
+            "Range 1-64 (size=64) should use U64");
+    }
+
+    #[test]
+    fn test_range_1_to_65_should_not_use_u64() {
+        // Range 1..=65 has size 65 (too large for U64)
+        let range = BallRange::new(BallNumber::new(1), BallNumber::new(65)).unwrap();
+        assert_eq!(range.size(), 65);
+        
+        let strategy = BitwiseStrategy::select(&range).unwrap();
+        assert_ne!(strategy, BitwiseStrategy::U64,
+            "Range 1-65 (size=65) CANNOT use U64");
+    }
 }
