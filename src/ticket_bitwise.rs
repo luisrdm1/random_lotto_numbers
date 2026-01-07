@@ -42,14 +42,14 @@ impl BitwiseStrategy {
     ///
     /// The optimal bitwise strategy or an error if range > 255
     pub fn select(range: &BallRange) -> Result<Self, LottoError> {
-        let max_value = range.end().value();
-        
-        if max_value <= 64 {
+        let size = range.size();
+
+        if size <= 64 {
             Ok(Self::U64)
-        } else if max_value <= 128 {
+        } else if size <= 128 {
             Ok(Self::U128)
         } else {
-            // For u8, max is 255, so this will handle 129-255
+            // For ranges larger than 128 values
             Ok(Self::VecU64)
         }
     }
@@ -80,30 +80,30 @@ pub fn generate_ticket_u64_bitmap(
     let min = range.start().value();
     let max = range.end().value();
     let picks = count.value();
-    
-    // Validate range fits in u64
-    if max > 64 {
+
+    // Validate range fits in u64 (by size, not by max value)
+    if range.size() > 64 {
         return Err(LottoError::InvalidRange {
             start: min,
             end: max,
         });
     }
-    
+
     let mut bitmap: u64 = 0;
     let mut ticket = Vec::with_capacity(picks);
-    
+
     while ticket.len() < picks {
         let ball_value = rng.gen_range_u8(min, max);
         let bit_position = ball_value - min; // Normalize to 0-based
         let bit_mask = 1u64 << bit_position;
-        
+
         // Check if ball already picked using bitwise AND
         if bitmap & bit_mask == 0 {
             bitmap |= bit_mask; // Set the bit
             ticket.push(BallNumber::new(ball_value));
         }
     }
-    
+
     Ok(ticket)
 }
 
@@ -132,30 +132,30 @@ pub fn generate_ticket_u128_bitmap(
     let min = range.start().value();
     let max = range.end().value();
     let picks = count.value();
-    
-    // Validate range fits in u128
-    if max > 128 {
+
+    // Validate range fits in u128 (by size, not by max value)
+    if range.size() > 128 {
         return Err(LottoError::InvalidRange {
             start: min,
             end: max,
         });
     }
-    
+
     let mut bitmap: u128 = 0;
     let mut ticket = Vec::with_capacity(picks);
-    
+
     while ticket.len() < picks {
         let ball_value = rng.gen_range_u8(min, max);
         let bit_position = ball_value - min; // Normalize to 0-based
         let bit_mask = 1u128 << bit_position;
-        
+
         // Check if ball already picked using bitwise AND
         if bitmap & bit_mask == 0 {
             bitmap |= bit_mask; // Set the bit
             ticket.push(BallNumber::new(ball_value));
         }
     }
-    
+
     Ok(ticket)
 }
 
@@ -184,28 +184,28 @@ pub fn generate_ticket_vec_bitmap(
     let min = range.start().value();
     let max = range.end().value();
     let picks = count.value();
-    
+
     // Validate range fits in Vec<u64> (u8 max is 255, so always fits)
     // Convert to larger types to avoid overflow
     let range_size = (max as usize) - (min as usize) + 1;
-    let vec_size = (range_size + 63) / 64; // Ceiling division
+    let vec_size = range_size.div_ceil(64);
     let mut bitmap = vec![0u64; vec_size];
     let mut ticket = Vec::with_capacity(picks);
-    
+
     while ticket.len() < picks {
         let ball_value = rng.gen_range_u8(min, max);
         let bit_position = (ball_value - min) as usize; // Normalize to 0-based
         let vec_index = bit_position / 64;
         let bit_offset = bit_position % 64;
         let bit_mask = 1u64 << bit_offset;
-        
+
         // Check if ball already picked using bitwise AND
         if bitmap[vec_index] & bit_mask == 0 {
             bitmap[vec_index] |= bit_mask; // Set the bit
             ticket.push(BallNumber::new(ball_value));
         }
     }
-    
+
     Ok(ticket)
 }
 
@@ -246,7 +246,7 @@ pub fn generate_ticket_bitwise(
     rng: &mut dyn RandomNumberGenerator,
 ) -> Result<Vec<BallNumber>, LottoError> {
     let strategy = BitwiseStrategy::select(range)?;
-    
+
     match strategy {
         BitwiseStrategy::U64 => generate_ticket_u64_bitmap(range, count, rng),
         BitwiseStrategy::U128 => generate_ticket_u128_bitmap(range, count, rng),
@@ -319,16 +319,16 @@ mod tests {
         let mut rng = rand::rng();
 
         let ticket = generate_ticket_u64_bitmap(&range, count, &mut rng).unwrap();
-        
+
         assert_eq!(ticket.len(), 6);
-        
+
         // Check all numbers are unique
         for i in 0..ticket.len() {
             for j in (i + 1)..ticket.len() {
                 assert_ne!(ticket[i], ticket[j]);
             }
         }
-        
+
         // Check all numbers are in range
         for ball in &ticket {
             assert!(range.contains(*ball));
@@ -342,16 +342,16 @@ mod tests {
         let mut rng = rand::rng();
 
         let ticket = generate_ticket_u128_bitmap(&range, count, &mut rng).unwrap();
-        
+
         assert_eq!(ticket.len(), 50);
-        
+
         // Check all numbers are unique
         for i in 0..ticket.len() {
             for j in (i + 1)..ticket.len() {
                 assert_ne!(ticket[i], ticket[j]);
             }
         }
-        
+
         // Check all numbers are in range
         for ball in &ticket {
             assert!(range.contains(*ball));
@@ -365,16 +365,16 @@ mod tests {
         let mut rng = rand::rng();
 
         let ticket = generate_ticket_vec_bitmap(&range, count, &mut rng).unwrap();
-        
+
         assert_eq!(ticket.len(), 10);
-        
+
         // Check all numbers are unique
         for i in 0..ticket.len() {
             for j in (i + 1)..ticket.len() {
                 assert_ne!(ticket[i], ticket[j]);
             }
         }
-        
+
         // Check all numbers are in range
         for ball in &ticket {
             assert!(range.contains(*ball));
@@ -384,20 +384,26 @@ mod tests {
     #[test]
     fn test_generate_ticket_bitwise_auto_selection() {
         let mut rng = rand::rng();
-        
+
         // Test u64 strategy
         let range1 = BallRange::mega_sena();
-        let ticket1 = generate_ticket_bitwise(&range1, PickCount::new(6, &range1).unwrap(), &mut rng).unwrap();
+        let ticket1 =
+            generate_ticket_bitwise(&range1, PickCount::new(6, &range1).unwrap(), &mut rng)
+                .unwrap();
         assert_eq!(ticket1.len(), 6);
-        
+
         // Test u128 strategy
         let range2 = BallRange::lotomania();
-        let ticket2 = generate_ticket_bitwise(&range2, PickCount::new(50, &range2).unwrap(), &mut rng).unwrap();
+        let ticket2 =
+            generate_ticket_bitwise(&range2, PickCount::new(50, &range2).unwrap(), &mut rng)
+                .unwrap();
         assert_eq!(ticket2.len(), 50);
-        
+
         // Test Vec<u64> strategy
         let range3 = BallRange::new(BallNumber::new(1), BallNumber::new(200)).unwrap();
-        let ticket3 = generate_ticket_bitwise(&range3, PickCount::new(10, &range3).unwrap(), &mut rng).unwrap();
+        let ticket3 =
+            generate_ticket_bitwise(&range3, PickCount::new(10, &range3).unwrap(), &mut rng)
+                .unwrap();
         assert_eq!(ticket3.len(), 10);
     }
 
@@ -432,10 +438,14 @@ mod tests {
         // Current (buggy): VecU64 (because end=255 > 128)
         let range = BallRange::new(BallNumber::new(200), BallNumber::new(255)).unwrap();
         assert_eq!(range.size(), 56);
-        
+
         let strategy = BitwiseStrategy::select(&range).unwrap();
-        assert_eq!(strategy, BitwiseStrategy::U64, 
-            "Range 200-255 (size=56) should use U64, not {:?}", strategy);
+        assert_eq!(
+            strategy,
+            BitwiseStrategy::U64,
+            "Range 200-255 (size=56) should use U64, not {:?}",
+            strategy
+        );
     }
 
     #[test]
@@ -445,10 +455,13 @@ mod tests {
         // Current (buggy): U64 (because end=64 <= 64) → causes panic in shift
         let range = BallRange::new(BallNumber::new(0), BallNumber::new(64)).unwrap();
         assert_eq!(range.size(), 65);
-        
+
         let strategy = BitwiseStrategy::select(&range).unwrap();
-        assert_ne!(strategy, BitwiseStrategy::U64,
-            "Range 0-64 (size=65) CANNOT use U64 (would cause shift overflow)");
+        assert_ne!(
+            strategy,
+            BitwiseStrategy::U64,
+            "Range 0-64 (size=65) CANNOT use U64 (would cause shift overflow)"
+        );
     }
 
     #[test]
@@ -456,13 +469,15 @@ mod tests {
         // Must reject range with size > 64, even if end <= 64
         let range = BallRange::new(BallNumber::new(0), BallNumber::new(64)).unwrap();
         assert_eq!(range.size(), 65);
-        
+
         let count = PickCount::new(5, &range).unwrap();
         let mut rng = rand::rng();
 
         let result = generate_ticket_u64_bitmap(&range, count, &mut rng);
-        assert!(result.is_err(), 
-            "u64_bitmap must reject range with size=65 (> 64)");
+        assert!(
+            result.is_err(),
+            "u64_bitmap must reject range with size=65 (> 64)"
+        );
     }
 
     #[test]
@@ -470,13 +485,15 @@ mod tests {
         // Must reject range with size > 128, even if end <= 128
         let range = BallRange::new(BallNumber::new(0), BallNumber::new(128)).unwrap();
         assert_eq!(range.size(), 129);
-        
+
         let count = PickCount::new(5, &range).unwrap();
         let mut rng = rand::rng();
 
         let result = generate_ticket_u128_bitmap(&range, count, &mut rng);
-        assert!(result.is_err(),
-            "u128_bitmap must reject range with size=129 (> 128)");
+        assert!(
+            result.is_err(),
+            "u128_bitmap must reject range with size=129 (> 128)"
+        );
     }
 
     #[test]
@@ -484,10 +501,13 @@ mod tests {
         // Valid case: Range 1..=64 has size 64 (OK for U64)
         let range = BallRange::new(BallNumber::new(1), BallNumber::new(64)).unwrap();
         assert_eq!(range.size(), 64);
-        
+
         let strategy = BitwiseStrategy::select(&range).unwrap();
-        assert_eq!(strategy, BitwiseStrategy::U64,
-            "Range 1-64 (size=64) should use U64");
+        assert_eq!(
+            strategy,
+            BitwiseStrategy::U64,
+            "Range 1-64 (size=64) should use U64"
+        );
     }
 
     #[test]
@@ -495,9 +515,12 @@ mod tests {
         // Range 1..=65 has size 65 (too large for U64)
         let range = BallRange::new(BallNumber::new(1), BallNumber::new(65)).unwrap();
         assert_eq!(range.size(), 65);
-        
+
         let strategy = BitwiseStrategy::select(&range).unwrap();
-        assert_ne!(strategy, BitwiseStrategy::U64,
-            "Range 1-65 (size=65) CANNOT use U64");
+        assert_ne!(
+            strategy,
+            BitwiseStrategy::U64,
+            "Range 1-65 (size=65) CANNOT use U64"
+        );
     }
 }

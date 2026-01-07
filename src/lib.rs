@@ -28,8 +28,8 @@ pub mod error;
 pub mod newtypes;
 pub mod probability;
 pub mod rng;
-pub mod ticket_bitwise;
 pub mod ticket;
+pub mod ticket_bitwise;
 
 pub use error::{LottoError, Result};
 pub use newtypes::{BallNumber, BallRange, GameCount, PickCount, Ticket};
@@ -72,14 +72,14 @@ impl Config {
     /// ```
     pub fn new(games: usize, start: u8, end: u8, pick: usize) -> Result<Self> {
         let game_count = GameCount::new(games)?;
-        
+
         // Ensure start <= end by swapping if necessary
         let (start, end) = if start <= end {
             (start, end)
         } else {
             (end, start)
         };
-        
+
         let range = BallRange::new(BallNumber::new(start), BallNumber::new(end))?;
         let pick_count = PickCount::new(pick, &range)?;
 
@@ -190,7 +190,7 @@ mod tests {
         let mut rng = rand::rng();
         let config = Config::new(10, 1, 60, 6).unwrap();
         let tickets = generate_tickets(&mut rng, &config).unwrap();
-        
+
         use std::collections::HashSet;
         let unique_tickets: HashSet<_> = tickets.iter().collect();
         assert_eq!(unique_tickets.len(), 10);

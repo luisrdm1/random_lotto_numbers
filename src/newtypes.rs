@@ -239,7 +239,7 @@ impl From<BallNumber> for u8 {
 
 impl TryFrom<u8> for BallNumber {
     type Error = crate::error::LottoError;
-    
+
     fn try_from(value: u8) -> crate::error::Result<Self> {
         // Accept all u8 values including 0 (valid for Lotomania 0-99)
         Ok(BallNumber::new(value))
@@ -462,7 +462,7 @@ mod tests {
             BallNumber::new(5),
             BallNumber::new(10),
         ]);
-        
+
         // Should be sorted
         assert_eq!(ticket.balls()[0].value(), 5);
         assert_eq!(ticket.balls()[1].value(), 10);
@@ -481,14 +481,8 @@ mod tests {
 
     #[test]
     fn test_ticket_equality() {
-        let ticket1 = Ticket::new(vec![
-            BallNumber::new(5),
-            BallNumber::new(10),
-        ]);
-        let ticket2 = Ticket::new(vec![
-            BallNumber::new(10),
-            BallNumber::new(5),
-        ]);
+        let ticket1 = Ticket::new(vec![BallNumber::new(5), BallNumber::new(10)]);
+        let ticket2 = Ticket::new(vec![BallNumber::new(10), BallNumber::new(5)]);
         // Should be equal even if created in different order
         assert_eq!(ticket1, ticket2);
     }

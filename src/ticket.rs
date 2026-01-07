@@ -77,7 +77,7 @@ fn generate_by_exclusion<R: RandomNumberGenerator>(
     let exclude_count = range_size - pick_count;
 
     let mut excluded = HashSet::with_capacity(exclude_count);
-    
+
     while excluded.len() < exclude_count {
         let value = rng.gen_range_u8(range.start().value(), range.end().value());
         excluded.insert(value);
@@ -153,7 +153,7 @@ fn generate_by_insertion<R: RandomNumberGenerator>(
 /// let range = BallRange::new(BallNumber::new(1), BallNumber::new(60)).unwrap();
 /// let pick = PickCount::new(6, &range).unwrap();
 /// let count = GameCount::new(10).unwrap();
-/// 
+///
 /// let tickets = generate_unique_tickets(&mut rng, &range, &pick, &count).unwrap();
 /// assert_eq!(tickets.len(), 10);
 /// ```
@@ -167,7 +167,7 @@ pub fn generate_unique_tickets<R: RandomNumberGenerator>(
 
     // Check if the requested number of unique tickets is mathematically possible
     let max_possible = combination(range.size(), pick.value())?;
-    
+
     if (game_count.value() as u128) > max_possible {
         return Err(crate::error::LottoError::TooManyUniqueGames {
             requested: game_count.value(),
@@ -176,7 +176,7 @@ pub fn generate_unique_tickets<R: RandomNumberGenerator>(
     }
 
     let mut tickets = HashSet::with_capacity(game_count.value());
-    
+
     // Calculate a reasonable maximum number of attempts
     // For small ratios (requested/possible), this is generous
     // For large ratios (approaching maximum), we need many more attempts
@@ -286,10 +286,10 @@ mod tests {
     fn test_generate_by_insertion_produces_correct_count() {
         let mut rng = rand::rng();
         let range = BallRange::new(BallNumber::new(1), BallNumber::new(60)).unwrap();
-        
+
         let balls = generate_by_insertion(&mut rng, &range, 10);
         assert_eq!(balls.len(), 10);
-        
+
         // Check uniqueness
         let unique: HashSet<_> = balls.iter().map(|b| b.value()).collect();
         assert_eq!(unique.len(), 10);
@@ -299,10 +299,10 @@ mod tests {
     fn test_generate_by_exclusion_produces_correct_count() {
         let mut rng = rand::rng();
         let range = BallRange::new(BallNumber::new(1), BallNumber::new(20)).unwrap();
-        
+
         let balls = generate_by_exclusion(&mut rng, &range, 15);
         assert_eq!(balls.len(), 15);
-        
+
         // Check uniqueness
         let unique: HashSet<_> = balls.iter().map(|b| b.value()).collect();
         assert_eq!(unique.len(), 15);
@@ -364,6 +364,9 @@ mod tests {
         let count = GameCount::new(11).unwrap();
 
         let result = generate_unique_tickets(&mut rng, &range, &pick, &count);
-        assert!(matches!(result, Err(crate::error::LottoError::TooManyUniqueGames { .. })));
+        assert!(matches!(
+            result,
+            Err(crate::error::LottoError::TooManyUniqueGames { .. })
+        ));
     }
 }

@@ -52,18 +52,26 @@ pub fn combination(n: usize, k: usize) -> Result<u128> {
 
     for i in 0..k {
         // Calculate (n - i) / (i + 1) iteratively with overflow checking
-        result = result
-            .checked_mul((n - i) as u128)
-            .ok_or_else(|| LottoError::CalculationOverflow {
-                operation: format!("combination C({},{}) multiplication overflow at iteration {}", n, k, i),
-            })?;
+        result =
+            result
+                .checked_mul((n - i) as u128)
+                .ok_or_else(|| LottoError::CalculationOverflow {
+                    operation: format!(
+                        "combination C({},{}) multiplication overflow at iteration {}",
+                        n, k, i
+                    ),
+                })?;
 
         // Division should never fail, but check for safety
-        result = result
-            .checked_div((i + 1) as u128)
-            .ok_or_else(|| LottoError::CalculationOverflow {
-                operation: format!("combination C({},{}) division by zero at iteration {}", n, k, i),
-            })?;
+        result =
+            result
+                .checked_div((i + 1) as u128)
+                .ok_or_else(|| LottoError::CalculationOverflow {
+                    operation: format!(
+                        "combination C({},{}) division by zero at iteration {}",
+                        n, k, i
+                    ),
+                })?;
     }
 
     Ok(result)
@@ -112,11 +120,12 @@ pub fn calculate_probability(
     let ways_to_match = combination(pick_count, match_count)?;
     let ways_to_miss = combination(total_balls - pick_count, pick_count - match_count)?;
 
-    let favorable_outcomes = ways_to_match
-        .checked_mul(ways_to_miss)
-        .ok_or_else(|| LottoError::CalculationOverflow {
-            operation: format!("favorable outcomes: {} * {}", ways_to_match, ways_to_miss),
-        })?;
+    let favorable_outcomes =
+        ways_to_match
+            .checked_mul(ways_to_miss)
+            .ok_or_else(|| LottoError::CalculationOverflow {
+                operation: format!("favorable outcomes: {} * {}", ways_to_match, ways_to_miss),
+            })?;
 
     Ok((favorable_outcomes, total_outcomes))
 }

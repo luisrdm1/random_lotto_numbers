@@ -36,11 +36,10 @@ pub enum LottoError {
     TooManyUniqueGames { requested: usize, maximum: u128 },
 
     /// Failed to generate requested number of unique tickets after many attempts.
-    #[error("Failed to generate {requested} unique tickets (only generated {generated} after maximum attempts)")]
-    UniqueGenerationFailed {
-        requested: usize,
-        generated: usize,
-    },
+    #[error(
+        "Failed to generate {requested} unique tickets (only generated {generated} after maximum attempts)"
+    )]
+    UniqueGenerationFailed { requested: usize, generated: usize },
 
     /// Input/output error during user interaction.
     #[error("I/O error: {0}")]

@@ -1,6 +1,6 @@
 use clap::Parser;
 use colored::Colorize;
-use lotto_quick_pick::{self as lqp, calculate_probability, generate_tickets, Config};
+use lotto_quick_pick::{self as lqp, Config, calculate_probability, generate_tickets};
 use rand::rng;
 
 /// Command-line lottery ticket generator.
@@ -69,7 +69,7 @@ fn main() {
     // Display probability if requested
     if let Some(matched_balls) = cli.matched {
         let total_balls = (cli.end_number - cli.start_number + 1) as usize;
-        
+
         match calculate_probability(total_balls, cli.pick, matched_balls) {
             Ok((favorable, total)) => {
                 // Simplify the fraction if possible
@@ -88,12 +88,17 @@ fn main() {
                     println!(
                         "\nYour probability of matching {} balls is approximately 1 in {}",
                         matched_balls,
-                        (simplified_total / simplified_favorable).to_string().bright_yellow()
+                        (simplified_total / simplified_favorable)
+                            .to_string()
+                            .bright_yellow()
                     );
                 }
             }
             Err(e) => {
-                eprintln!("{}", format!("Probability calculation error: {}", e).red().bold());
+                eprintln!(
+                    "{}",
+                    format!("Probability calculation error: {}", e).red().bold()
+                );
             }
         }
     }
@@ -136,7 +141,7 @@ fn gcd_u128(mut a: u128, mut b: u128) -> u128 {
 //         println!("1. Generate tickets");
 //         println!("2. Calculate probability");
 //         println!("3. Exit");
-//         
+//
 //         // Read user choice
 //         // If generate: prompt for parameters, create Config, generate, display
 //         // If calculate: prompt for parameters, call calculate_probability, display

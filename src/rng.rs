@@ -69,7 +69,7 @@ mod tests {
     #[test]
     fn test_mock_rng_returns_predictable_values() {
         let mut rng = MockRng::new(vec![5, 10, 15]);
-        
+
         assert_eq!(rng.gen_range_u8(1, 60), 5);
         assert_eq!(rng.gen_range_u8(1, 60), 10);
         assert_eq!(rng.gen_range_u8(1, 60), 15);
@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn test_thread_rng_generates_within_range() {
         let mut rng = rand::rng();
-        
+
         for _ in 0..100 {
             let value = rng.gen_range_u8(1, 60);
             assert!((1..=60).contains(&value));
