@@ -5,8 +5,6 @@
 
 use crate::newtypes::{BallNumber, BallRange, GameCount, PickCount, Ticket};
 use crate::rng::RandomNumberGenerator;
-use crate::ticket_bitwise::generate_ticket_bitwise;
-use crate::ticket_key::TicketKey;
 use std::collections::HashSet;
 
 /// Generate a single lottery ticket with unique random ball numbers.
@@ -41,8 +39,8 @@ pub fn generate_ticket<R: RandomNumberGenerator>(
     pick: &PickCount,
 ) -> Ticket {
     // Try bitwise strategy first (fastest, 55-67% performance improvement)
-    if let Ok(balls) = generate_ticket_bitwise(range, *pick, rng) {
-        return Ticket::new(balls);
+    if let Ok(key) = crate::ticket_bitwise::generate_ticketkey_bitwise(range, *pick, rng) {
+        return Ticket::new(key.to_balls(range));
     }
 
     // Fallback to HashSet strategy for edge cases or errors
@@ -201,8 +199,8 @@ pub fn generate_unique_tickets<R: RandomNumberGenerator>(
             });
         }
 
-        let ticket = generate_ticket(rng, range, pick);
-        let key = TicketKey::from_balls(ticket.balls(), range);
+        // Generate TicketKey directly without intermediate Vec<BallNumber>
+        let key = crate::ticket_bitwise::generate_ticketkey_bitwise(range, *pick, rng)?;
         ticket_keys.insert(key);
         attempts += 1;
     }
@@ -212,6 +210,65 @@ pub fn generate_unique_tickets<R: RandomNumberGenerator>(
         .into_iter()
         .map(|key| Ticket::new(key.to_balls(range)))
         .collect())
+}
+
+/// Generate multiple unique tickets using HashSet<Ticket> directly (old implementation).
+///
+/// This function is provided for benchmarking comparison purposes only.
+/// The main implementation uses TicketKey for better performance.
+///
+/// # Performance
+///
+/// This approach is slower because:
+/// - Ticket contains Vec<BallNumber> which requires heap allocation
+/// - Hashing a Vec is slower than hashing u64/u128
+/// - Worse cache locality due to pointer indirection
+#[doc(hidden)]
+pub fn generate_unique_tickets_with_ticket_hashset<R: RandomNumberGenerator>(
+    rng: &mut R,
+    range: &BallRange,
+    pick: &PickCount,
+    game_count: &GameCount,
+) -> crate::error::Result<Vec<Ticket>> {
+    use crate::probability::combination;
+
+    let max_possible = combination(range.size(), pick.value())?;
+
+    if (game_count.value() as u128) > max_possible {
+        return Err(crate::error::LottoError::TooManyUniqueGames {
+            requested: game_count.value(),
+            maximum: max_possible,
+        });
+    }
+
+    // Old implementation: Use HashSet<Ticket> directly
+    let mut tickets = HashSet::with_capacity(game_count.value());
+
+    let ratio = (game_count.value() as f64) / (max_possible as f64);
+    let max_attempts = if ratio < 0.5 {
+        game_count.value() * 100
+    } else if ratio < 0.8 {
+        game_count.value() * 1000
+    } else {
+        game_count.value() * 10000
+    };
+
+    let mut attempts = 0;
+
+    while tickets.len() < game_count.value() {
+        if attempts >= max_attempts {
+            return Err(crate::error::LottoError::UniqueGenerationFailed {
+                requested: game_count.value(),
+                generated: tickets.len(),
+            });
+        }
+
+        let ticket = generate_ticket(rng, range, pick);
+        tickets.insert(ticket);
+        attempts += 1;
+    }
+
+    Ok(tickets.into_iter().collect())
 }
 
 #[cfg(test)]

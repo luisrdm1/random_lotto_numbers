@@ -1,13 +1,31 @@
 # Lotto Quick Pick
 
-Gerador de bilhetes de loteria em Rust com estratégias otimizadas por bitwise operations.
+Gerador de bilhetes de loteria em Rust com estratégias otimizadas por bitwise operations e representação bitmap compacta.
 
 ## ⚡ Performance
 
-- **Estratégia principal**: Operações bitwise (55-67% mais rápido que HashSet)
+### Geração Direta com TicketKey (v1.2.0+)
+
+**30% mais rápido** que versão anterior através de geração direta de bitmaps:
+
+| Operação | Tempo | vs v1.1 |
+|----------|-------|---------|
+| Mega-Sena 1000 jogos | 117 µs | **-30%** (era 167 µs) |
+| Lotomania 100 jogos | 89 µs | **-23%** (era 115 µs) |
+
+**Fluxo otimizado**:
+```
+ANTES (v1.1):  bitmap → Vec<BallNumber> → TicketKey → HashSet
+AGORA (v1.2):  bitmap → TicketKey → HashSet → Vec (só na saída)
+```
+
+### Estratégias de Geração
+
+- **Estratégia principal**: Operações bitwise com TicketKey direto
 - **Fallback automático**: HashSet para casos especiais
 - **Zero overhead**: Funções genéricas sem vtable (monomorphization)
 - **Seleção inteligente**: Escolhe automaticamente u64/u128/Vec\<u64\> baseado no tamanho do range
+- **Validação always-on**: `assert!` garante invariantes de bitmap (bit count, máscara válida)
 
 ## 🚀 Quick Start
 

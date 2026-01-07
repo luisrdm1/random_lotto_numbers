@@ -25,6 +25,7 @@
 use crate::error::LottoError;
 use crate::newtypes::{BallNumber, BallRange, PickCount};
 use crate::rng::RandomNumberGenerator;
+use crate::ticket_key::TicketKey;
 use std::vec::Vec;
 
 /// Determines which bitmap strategy to use based on the range size.
@@ -64,6 +65,8 @@ impl BitwiseStrategy {
 
 /// Generates a lottery ticket using u64 bitmap for duplicate checking.
 ///
+/// **DEPRECATED**: Use [`generate_ticketkey_u64_bitmap`] instead for better performance.
+///
 /// This strategy works for ranges where max value ≤ 64.
 ///
 /// # Time Complexity
@@ -79,6 +82,10 @@ impl BitwiseStrategy {
 /// # Returns
 ///
 /// A vector of unique ball numbers or an error
+#[deprecated(
+    since = "1.2.0",
+    note = "Use generate_ticketkey_u64_bitmap() instead for better performance"
+)]
 pub fn generate_ticket_u64_bitmap<R: RandomNumberGenerator>(
     range: &BallRange,
     count: PickCount,
@@ -116,6 +123,8 @@ pub fn generate_ticket_u64_bitmap<R: RandomNumberGenerator>(
 
 /// Generates a lottery ticket using u128 bitmap for duplicate checking.
 ///
+/// **DEPRECATED**: Use [`generate_ticketkey_u128_bitmap`] instead for better performance.
+///
 /// This strategy works for ranges where max value ≤ 128.
 ///
 /// # Time Complexity
@@ -131,6 +140,10 @@ pub fn generate_ticket_u64_bitmap<R: RandomNumberGenerator>(
 /// # Returns
 ///
 /// A vector of unique ball numbers or an error
+#[deprecated(
+    since = "1.2.0",
+    note = "Use generate_ticketkey_u128_bitmap() instead for better performance"
+)]
 pub fn generate_ticket_u128_bitmap<R: RandomNumberGenerator>(
     range: &BallRange,
     count: PickCount,
@@ -183,6 +196,10 @@ pub fn generate_ticket_u128_bitmap<R: RandomNumberGenerator>(
 /// # Returns
 ///
 /// A vector of unique ball numbers or an error
+#[deprecated(
+    since = "1.2.0",
+    note = "Use generate_ticketkey_vec_bitmap() instead for better performance"
+)]
 pub fn generate_ticket_vec_bitmap<R: RandomNumberGenerator>(
     range: &BallRange,
     count: PickCount,
@@ -247,6 +264,10 @@ pub fn generate_ticket_vec_bitmap<R: RandomNumberGenerator>(
 /// let ticket = generate_ticket_bitwise(&range, count, &mut rng).unwrap();
 /// assert_eq!(ticket.len(), 6);
 /// ```
+#[deprecated(
+    since = "1.2.0",
+    note = "Use generate_ticketkey_bitwise() instead for better performance"
+)]
 pub fn generate_ticket_bitwise<R: RandomNumberGenerator>(
     range: &BallRange,
     count: PickCount,
@@ -258,6 +279,245 @@ pub fn generate_ticket_bitwise<R: RandomNumberGenerator>(
         BitwiseStrategy::U64 => generate_ticket_u64_bitmap(range, count, rng),
         BitwiseStrategy::U128 => generate_ticket_u128_bitmap(range, count, rng),
         BitwiseStrategy::VecU64 => generate_ticket_vec_bitmap(range, count, rng),
+    }
+}
+
+/// Generates a lottery ticket using u64 bitmap, returning TicketKey directly.
+///
+/// This is the optimized version that avoids creating intermediate Vec<BallNumber>.
+/// Use this when you need TicketKey for HashSet-based uniqueness checking.
+///
+/// # Arguments
+///
+/// * `range` - The range of ball numbers (must have size ≤ 64)
+/// * `count` - Number of balls to pick
+/// * `rng` - Random number generator
+///
+/// # Returns
+///
+/// A TicketKey::U64 containing the bitmap
+pub fn generate_ticketkey_u64_bitmap<R: RandomNumberGenerator>(
+    range: &BallRange,
+    count: PickCount,
+    rng: &mut R,
+) -> Result<TicketKey, LottoError> {
+    let min = range.start().value();
+    let max = range.end().value();
+    let picks = count.value();
+
+    // Validate range fits in u64 (by size, not by max value)
+    if range.size() > 64 {
+        return Err(LottoError::InvalidRange {
+            start: min,
+            end: max,
+        });
+    }
+
+    let mut bitmap: u64 = 0;
+    let mut picked_count = 0;
+
+    while picked_count < picks {
+        let ball_value = rng.gen_range_u8(min, max);
+        let bit_position = ball_value - min;
+        let bit_mask = 1u64 << bit_position;
+
+        if bitmap & bit_mask == 0 {
+            bitmap |= bit_mask;
+            picked_count += 1;
+        }
+    }
+
+    // Validate invariants
+    let actual_count = bitmap.count_ones() as usize;
+    assert_eq!(
+        actual_count, picks,
+        "bitmap should have exactly {} bits set, got {}",
+        picks, actual_count
+    );
+
+    // Validate no bits outside range
+    let valid_mask = if range.size() == 64 {
+        u64::MAX
+    } else {
+        (1u64 << range.size()) - 1
+    };
+    assert_eq!(
+        bitmap & !valid_mask,
+        0,
+        "bitmap 0x{:016X} has bits set outside valid range (mask: 0x{:016X})",
+        bitmap,
+        valid_mask
+    );
+
+    Ok(TicketKey::U64(bitmap))
+}
+
+/// Generates a lottery ticket using u128 bitmap, returning TicketKey directly.
+///
+/// This is the optimized version that avoids creating intermediate Vec<BallNumber>.
+/// Use this when you need TicketKey for HashSet-based uniqueness checking.
+///
+/// # Arguments
+///
+/// * `range` - The range of ball numbers (must have size ≤ 128)
+/// * `count` - Number of balls to pick
+/// * `rng` - Random number generator
+///
+/// # Returns
+///
+/// A TicketKey::U128 containing the bitmap
+pub fn generate_ticketkey_u128_bitmap<R: RandomNumberGenerator>(
+    range: &BallRange,
+    count: PickCount,
+    rng: &mut R,
+) -> Result<TicketKey, LottoError> {
+    let min = range.start().value();
+    let max = range.end().value();
+    let picks = count.value();
+
+    // Validate range fits in u128
+    if range.size() > 128 {
+        return Err(LottoError::InvalidRange {
+            start: min,
+            end: max,
+        });
+    }
+
+    let mut bitmap: u128 = 0;
+    let mut picked_count = 0;
+
+    while picked_count < picks {
+        let ball_value = rng.gen_range_u8(min, max);
+        let bit_position = ball_value - min;
+        let bit_mask = 1u128 << bit_position;
+
+        if bitmap & bit_mask == 0 {
+            bitmap |= bit_mask;
+            picked_count += 1;
+        }
+    }
+
+    // Validate invariants
+    let actual_count = bitmap.count_ones() as usize;
+    assert_eq!(
+        actual_count, picks,
+        "bitmap should have exactly {} bits set, got {}",
+        picks, actual_count
+    );
+
+    // Validate no bits outside range
+    let valid_mask = if range.size() == 128 {
+        u128::MAX
+    } else {
+        (1u128 << range.size()) - 1
+    };
+    assert_eq!(
+        bitmap & !valid_mask,
+        0,
+        "bitmap 0x{:032X} has bits set outside valid range (mask: 0x{:032X})",
+        bitmap,
+        valid_mask
+    );
+
+    Ok(TicketKey::U128(bitmap))
+}
+
+/// Generates a lottery ticket using Vec<u64> bitmap, returning TicketKey directly.
+///
+/// This is the optimized version that avoids creating intermediate Vec<BallNumber>.
+/// Use this when you need TicketKey for HashSet-based uniqueness checking.
+///
+/// # Arguments
+///
+/// * `range` - The range of ball numbers (any size)
+/// * `count` - Number of balls to pick
+/// * `rng` - Random number generator
+///
+/// # Returns
+///
+/// A TicketKey::VecU64 containing the bitmap
+pub fn generate_ticketkey_vec_bitmap<R: RandomNumberGenerator>(
+    range: &BallRange,
+    count: PickCount,
+    rng: &mut R,
+) -> Result<TicketKey, LottoError> {
+    let min = range.start().value();
+    let max = range.end().value();
+    let picks = count.value();
+    let range_size = range.size();
+
+    // Calculate bitmap size
+    let words_needed = range_size.div_ceil(64);
+    let mut bitmap: Vec<u64> = vec![0; words_needed];
+    let mut picked_count = 0;
+
+    while picked_count < picks {
+        let ball_value = rng.gen_range_u8(min, max);
+        let bit_position = (ball_value - min) as usize;
+        let word_index = bit_position / 64;
+        let bit_offset = bit_position % 64;
+        let bit_mask = 1u64 << bit_offset;
+
+        if bitmap[word_index] & bit_mask == 0 {
+            bitmap[word_index] |= bit_mask;
+            picked_count += 1;
+        }
+    }
+
+    // Validate invariants
+    let actual_count: usize = bitmap.iter().map(|w| w.count_ones() as usize).sum();
+    assert_eq!(
+        actual_count, picks,
+        "bitmap should have exactly {} bits set, got {}",
+        picks, actual_count
+    );
+
+    // Validate no bits outside range in last word
+    let remaining_bits = range_size % 64;
+    if remaining_bits > 0 {
+        let last_word = bitmap[words_needed - 1];
+        let last_mask = (1u64 << remaining_bits) - 1;
+        assert_eq!(
+            last_word & !last_mask,
+            0,
+            "bitmap has bits set outside valid range in last word"
+        );
+    }
+
+    Ok(TicketKey::VecU64(bitmap))
+}
+
+/// Unified wrapper that generates TicketKey using optimal bitwise strategy.
+///
+/// Automatically selects U64, U128, or VecU64 based on range size.
+/// This is the preferred function for generating tickets with TicketKey.
+///
+/// # Example
+///
+/// ```
+/// use lotto_quick_pick::ticket_bitwise::generate_ticketkey_bitwise;
+/// use lotto_quick_pick::newtypes::{BallRange, PickCount};
+/// use rand::rng;
+///
+/// let range = BallRange::mega_sena();
+/// let count = PickCount::new(6, &range).unwrap();
+/// let mut rng = rand::rng();
+///
+/// let key = generate_ticketkey_bitwise(&range, count, &mut rng).unwrap();
+/// let balls = key.to_balls(&range);
+/// assert_eq!(balls.len(), 6);
+/// ```
+pub fn generate_ticketkey_bitwise<R: RandomNumberGenerator>(
+    range: &BallRange,
+    count: PickCount,
+    rng: &mut R,
+) -> Result<TicketKey, LottoError> {
+    let strategy = BitwiseStrategy::select(range)?;
+
+    match strategy {
+        BitwiseStrategy::U64 => generate_ticketkey_u64_bitmap(range, count, rng),
+        BitwiseStrategy::U128 => generate_ticketkey_u128_bitmap(range, count, rng),
+        BitwiseStrategy::VecU64 => generate_ticketkey_vec_bitmap(range, count, rng),
     }
 }
 
@@ -506,5 +766,135 @@ mod tests {
             BitwiseStrategy::U64,
             "Range 1-65 (size=65) CANNOT use U64"
         );
+    }
+
+    // Tests for TicketKey generation functions
+
+    #[test]
+    fn test_ticketkey_u64_validates_bit_count() {
+        let range = BallRange::mega_sena();
+        let pick = PickCount::new(6, &range).unwrap();
+        let mut rng = rand::rng();
+
+        let key = generate_ticketkey_u64_bitmap(&range, pick, &mut rng).unwrap();
+        assert_eq!(key.count_balls(), 6);
+    }
+
+    #[test]
+    fn test_ticketkey_u64_rejects_size_65() {
+        let range = BallRange::new(BallNumber::new(0), BallNumber::new(64)).unwrap();
+        assert_eq!(range.size(), 65);
+
+        let count = PickCount::new(5, &range).unwrap();
+        let mut rng = rand::rng();
+
+        let result = generate_ticketkey_u64_bitmap(&range, count, &mut rng);
+        assert!(result.is_err(), "Should reject range size > 64");
+    }
+
+    #[test]
+    fn test_ticketkey_u64_max_range_boundary() {
+        let range = BallRange::new(BallNumber::new(0), BallNumber::new(63)).unwrap();
+        assert_eq!(range.size(), 64);
+
+        let count = PickCount::new(10, &range).unwrap();
+        let mut rng = rand::rng();
+
+        let key = generate_ticketkey_u64_bitmap(&range, count, &mut rng).unwrap();
+        assert_eq!(key.count_balls(), 10);
+    }
+
+    #[test]
+    fn test_ticketkey_u128_validates_bit_count() {
+        let range = BallRange::lotomania();
+        let pick = PickCount::new(50, &range).unwrap();
+        let mut rng = rand::rng();
+
+        let key = generate_ticketkey_u128_bitmap(&range, pick, &mut rng).unwrap();
+        assert_eq!(key.count_balls(), 50);
+    }
+
+    #[test]
+    fn test_ticketkey_u128_max_range_boundary() {
+        let range = BallRange::new(BallNumber::new(0), BallNumber::new(127)).unwrap();
+        assert_eq!(range.size(), 128);
+
+        let count = PickCount::new(20, &range).unwrap();
+        let mut rng = rand::rng();
+
+        let key = generate_ticketkey_u128_bitmap(&range, count, &mut rng).unwrap();
+        assert_eq!(key.count_balls(), 20);
+    }
+
+    #[test]
+    fn test_ticketkey_vec_validates_bit_count() {
+        let range = BallRange::new(BallNumber::new(0), BallNumber::new(200)).unwrap();
+        let pick = PickCount::new(15, &range).unwrap();
+        let mut rng = rand::rng();
+
+        let key = generate_ticketkey_vec_bitmap(&range, pick, &mut rng).unwrap();
+        assert_eq!(key.count_balls(), 15);
+    }
+
+    #[test]
+    fn test_ticketkey_roundtrip_preserves_all_balls() {
+        let range = BallRange::mega_sena();
+        let pick = PickCount::new(6, &range).unwrap();
+        let mut rng = rand::rng();
+
+        let key = generate_ticketkey_bitwise(&range, pick, &mut rng).unwrap();
+        let balls = key.to_balls(&range);
+
+        assert_eq!(balls.len(), pick.value());
+        for &ball in &balls {
+            assert!(range.contains(ball), "Ball {:?} is outside range", ball);
+        }
+    }
+
+    #[test]
+    fn test_ticketkey_no_duplicates() {
+        let range = BallRange::mega_sena();
+        let pick = PickCount::new(6, &range).unwrap();
+        let mut rng = rand::rng();
+
+        let key = generate_ticketkey_bitwise(&range, pick, &mut rng).unwrap();
+        let balls = key.to_balls(&range);
+
+        let mut seen = std::collections::HashSet::new();
+        for ball in balls {
+            assert!(seen.insert(ball), "Duplicate ball: {:?}", ball);
+        }
+    }
+
+    #[test]
+    fn test_ticketkey_single_value_range() {
+        let range = BallRange::new(BallNumber::new(42), BallNumber::new(43)).unwrap();
+        assert_eq!(range.size(), 2);
+
+        let count = PickCount::new(1, &range).unwrap();
+        let mut rng = rand::rng();
+
+        let key = generate_ticketkey_bitwise(&range, count, &mut rng).unwrap();
+        let balls = key.to_balls(&range);
+
+        assert_eq!(balls.len(), 1);
+        assert!(balls[0].value() == 42 || balls[0].value() == 43);
+    }
+
+    #[test]
+    fn test_ticketkey_full_range_selection() {
+        let range = BallRange::new(BallNumber::new(1), BallNumber::new(10)).unwrap();
+        let count = PickCount::new(10, &range).unwrap();
+        let mut rng = rand::rng();
+
+        let key = generate_ticketkey_bitwise(&range, count, &mut rng).unwrap();
+        let balls = key.to_balls(&range);
+
+        assert_eq!(balls.len(), 10);
+        let mut sorted = balls.clone();
+        sorted.sort_by_key(|b| b.value());
+        for (i, &ball) in sorted.iter().enumerate() {
+            assert_eq!(ball.value(), (i + 1) as u8);
+        }
     }
 }

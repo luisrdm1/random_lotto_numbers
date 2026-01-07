@@ -80,16 +80,18 @@ impl TicketKey {
         let min = range.start().value();
         let mut balls = Vec::new();
 
+        let range_size = range.size();
+
         match self {
             TicketKey::U64(bitmap) => {
-                for i in 0..64 {
+                for i in 0..range_size.min(64) {
                     if bitmap & (1u64 << i) != 0 {
                         balls.push(BallNumber::new(min + i as u8));
                     }
                 }
             }
             TicketKey::U128(bitmap) => {
-                for i in 0..128 {
+                for i in 0..range_size.min(128) {
                     if bitmap & (1u128 << i) != 0 {
                         balls.push(BallNumber::new(min + i as u8));
                     }
@@ -98,8 +100,11 @@ impl TicketKey {
             TicketKey::VecU64(bitmap) => {
                 for (idx, &word) in bitmap.iter().enumerate() {
                     for bit in 0..64 {
+                        let offset = idx * 64 + bit;
+                        if offset >= range_size {
+                            break;
+                        }
                         if word & (1u64 << bit) != 0 {
-                            let offset = idx * 64 + bit;
                             balls.push(BallNumber::new(min + offset as u8));
                         }
                     }
