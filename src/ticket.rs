@@ -6,6 +6,7 @@
 use crate::newtypes::{BallNumber, BallRange, GameCount, PickCount, Ticket};
 use crate::rng::RandomNumberGenerator;
 use crate::ticket_bitwise::generate_ticket_bitwise;
+use crate::ticket_key::TicketKey;
 use std::collections::HashSet;
 
 /// Generate a single lottery ticket with unique random ball numbers.
@@ -175,7 +176,8 @@ pub fn generate_unique_tickets<R: RandomNumberGenerator>(
         });
     }
 
-    let mut tickets = HashSet::with_capacity(game_count.value());
+    // Use TicketKey for efficient uniqueness checking (smaller, faster hashing)
+    let mut ticket_keys = HashSet::with_capacity(game_count.value());
 
     // Calculate a reasonable maximum number of attempts
     // For small ratios (requested/possible), this is generous
@@ -191,20 +193,25 @@ pub fn generate_unique_tickets<R: RandomNumberGenerator>(
 
     let mut attempts = 0;
 
-    while tickets.len() < game_count.value() {
+    while ticket_keys.len() < game_count.value() {
         if attempts >= max_attempts {
             return Err(crate::error::LottoError::UniqueGenerationFailed {
                 requested: game_count.value(),
-                generated: tickets.len(),
+                generated: ticket_keys.len(),
             });
         }
 
         let ticket = generate_ticket(rng, range, pick);
-        tickets.insert(ticket);
+        let key = TicketKey::from_balls(ticket.balls(), range);
+        ticket_keys.insert(key);
         attempts += 1;
     }
 
-    Ok(tickets.into_iter().collect())
+    // Convert TicketKey back to Ticket only at the end
+    Ok(ticket_keys
+        .into_iter()
+        .map(|key| Ticket::new(key.to_balls(range)))
+        .collect())
 }
 
 #[cfg(test)]

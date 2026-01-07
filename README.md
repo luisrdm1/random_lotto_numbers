@@ -91,7 +91,7 @@ hashset_mega_sena    ~3.5μs  (55% mais lento)
 ## 🧪 Testes
 
 ```bash
-cargo test              # 68 unit tests + 23 doctests
+cargo test              # 75 unit tests + 23 doctests
 cargo clippy --all-targets  # Linting
 ```
 
@@ -101,8 +101,9 @@ cargo clippy --all-targets  # Linting
 src/
 ├── lib.rs              # API pública
 ├── main.rs             # CLI
-├── ticket.rs           # Geração (bitwise + fallback)
+├── ticket.rs           # Geração (bitwise + TicketKey para unicidade)
 ├── ticket_bitwise.rs   # Estratégias otimizadas (u64/u128/Vec)
+├── ticket_key.rs       # Representação bitmap compacta para HashSet
 ├── newtypes.rs         # Domain types (BallNumber, Ticket, etc)
 ├── probability.rs      # Cálculos combinatórios (sem overflow)
 ├── rng.rs              # Trait RandomNumberGenerator
@@ -118,6 +119,16 @@ Seleção automática baseada no **tamanho do range** (não no valor máximo):
 - **Vec\<u64\>**: Range com mais de 128 valores
 
 **Exemplo**: Range 200-255 tem apenas 56 valores → usa u64 (mais eficiente)
+
+### TicketKey: Representação Bitmap
+
+Para geração de múltiplos tickets únicos, usamos `HashSet<TicketKey>` ao invés de `HashSet<Ticket>`:
+
+- **Menor footprint**: u64/u128 vs Vec\<BallNumber\> com alocações
+- **Hash mais rápido**: Hash direto de inteiros vs hash de Vec
+- **Melhor cache locality**: Dados contíguos vs ponteiros espalhados
+
+Conversão para `Ticket` apenas na saída final.
 
 ### Construção de Tickets
 

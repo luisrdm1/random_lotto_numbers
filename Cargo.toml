@@ -32,6 +32,10 @@ harness = false
 name = "bitwise_comparison"
 harness = false
 
+[[bench]]
+name = "ticket_key_comparison"
+harness = false
+
 [profile.release]
 opt-level = 3          # máximo foco em performance
 lto = "fat"            # melhor otimização global (mais lento pra compilar)

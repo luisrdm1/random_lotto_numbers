@@ -30,6 +30,7 @@ pub mod probability;
 pub mod rng;
 pub mod ticket;
 pub mod ticket_bitwise;
+pub mod ticket_key;
 
 pub use error::{LottoError, Result};
 pub use newtypes::{BallNumber, BallRange, GameCount, PickCount, Ticket};
