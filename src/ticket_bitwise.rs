@@ -1,19 +1,26 @@
 //! Bitwise/bitmask optimization strategies for lottery ticket generation.
 //!
-//! This module implements alternative ticket generation algorithms using bitwise operations
-//! instead of HashSet. The goal is to measure if bitmap-based duplicate checking provides
-//! measurable performance improvements over hash-based approaches.
+//! This module implements high-performance ticket generation using bitwise operations
+//! for duplicate checking. Benchmarks show 55-67% performance improvement over HashSet.
 //!
 //! # Strategies
 //!
-//! - **u64 bitmap**: For ranges ≤ 64 (e.g., Mega-Sena with range 1-60)
-//! - **u128 bitmap**: For ranges ≤ 128 (e.g., Lotomania with range 0-99)
-//! - **Vec<u64> bitmap**: For ranges ≤ 512 (supporting larger lottery systems)
+//! Selection is based on **range size** (number of possible values), not max value:
 //!
-//! # Expected Performance
+//! - **u64 bitmap**: For ranges with ≤ 64 values
+//!   - Example: Mega-Sena (1-60) has 60 values → uses u64
+//!   - Example: Range 200-255 has 56 values → uses u64
+//! - **u128 bitmap**: For ranges with 65-128 values
+//!   - Example: Lotomania (0-99) has 100 values → uses u128
+//! - **Vec<u64> bitmap**: For ranges with > 128 values
+//!   - Example: Range 0-255 has 256 values → uses Vec<u64>
 //!
-//! Bitwise AND operations for duplicate checking should be O(1) vs HashSet's O(1) amortized,
-//! but with better cache locality and no hashing overhead. Expected gains: 30-50% for small ranges.
+//! # Performance
+//!
+//! - Zero-cost abstraction: Generic functions enable monomorphization (no vtable)
+//! - O(1) duplicate checking with better cache locality than HashSet
+//! - No hashing overhead
+//! - Measured gains: 55-67% faster than HashSet for typical lottery ranges
 
 use crate::error::LottoError;
 use crate::newtypes::{BallNumber, BallRange, PickCount};

@@ -6,7 +6,8 @@ Gerador de bilhetes de loteria em Rust com estratégias otimizadas por bitwise o
 
 - **Estratégia principal**: Operações bitwise (55-67% mais rápido que HashSet)
 - **Fallback automático**: HashSet para casos especiais
-- **Zero overhead**: Generic dispatch sem vtable
+- **Zero overhead**: Funções genéricas sem vtable (monomorphization)
+- **Seleção inteligente**: Escolhe automaticamente u64/u128/Vec\<u64\> baseado no tamanho do range
 
 ## 🚀 Quick Start
 
@@ -90,7 +91,7 @@ hashset_mega_sena    ~3.5μs  (55% mais lento)
 ## 🧪 Testes
 
 ```bash
-cargo test              # 54 unit tests + 21 doctests
+cargo test              # 68 unit tests + 23 doctests
 cargo clippy --all-targets  # Linting
 ```
 
@@ -110,11 +111,23 @@ src/
 
 ### Estratégias Bitwise
 
-- **u64**: Até 64 bolas (ex: Mega-Sena)
-- **u128**: Até 128 bolas (ex: Lotomania)
-- **Vec\<u64\>**: Ranges maiores
+Seleção automática baseada no **tamanho do range** (não no valor máximo):
 
-Seleção automática baseada no range.
+- **u64**: Range com até 64 valores (ex: Mega-Sena 1-60 tem 60 valores)
+- **u128**: Range com 65-128 valores (ex: Lotomania 0-99 tem 100 valores)
+- **Vec\<u64\>**: Range com mais de 128 valores
+
+**Exemplo**: Range 200-255 tem apenas 56 valores → usa u64 (mais eficiente)
+
+### Construção de Tickets
+
+- **`Ticket::new(balls)`**: Cria ticket sem validação (apenas ordena)
+- **`Ticket::try_new(balls, range, pick)`**: Cria ticket com validação completa
+  - Valida tamanho correto
+  - Valida que todas as bolas estão no range
+  - Valida unicidade (sem duplicatas)
+
+Use `try_new()` quando receber dados externos. Use `new()` apenas quando tem certeza que os dados são válidos.
 
 ## 🔧 RNG Customizado
 
