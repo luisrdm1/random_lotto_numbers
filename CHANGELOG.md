@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-01-07
+
+### Added
+
+- **`BitwiseStrategy::generate()` method**: Centralized dispatch for strategy-based generation
+  - Eliminates code duplication between `generate_unique_tickets()` and `generate_ticketkey_bitwise()`
+  - Cleaner API: `strategy.generate(range, count, rng)` instead of manual match
+  - Single source of truth for strategy dispatch logic
+
+### Changed
+
+- **Validation with `debug_assert!`**: Replaced 6 `assert!` calls with `debug_assert!`
+  - U64 bitmap: 2 validations (bit count + bitmask)
+  - U128 bitmap: 2 validations (bit count + bitmask)
+  - VecU64 bitmap: 2 validations (bit count + last word mask)
+  - **Zero overhead in release builds** while maintaining debug safety
+  - Invariants validated during testing, removed from hot path in production
+
+- **Fixed unnecessary sorting in `generate_ticket()`**: Now uses `Ticket::from_sorted()`
+  - `to_balls()` returns pre-sorted Vec (trailing_zeros iteration is naturally ordered)
+  - Eliminates redundant `sort_unstable()` call
+  - Consistent with `generate_unique_tickets()` optimization from v1.3.0
+
+- **Integer-based ratio calculation**: Replaced floating-point division with integer comparisons
+  - `requested * 2 < max_possible` instead of `ratio < 0.5`
+  - `requested * 10 < max_possible * 8` instead of `ratio < 0.8`
+  - Eliminates FPU dependency in `generate_unique_tickets()`
+  - Micro-optimization with clearer intent
+
+### Performance
+
+Expected improvements from `debug_assert!` conversion:
+- Removes 6 conditional checks per ticket in release builds
+- Bit count validation (count_ones) eliminated from hot path
+- Bitmask validation comparisons removed from hot path
+
+Note: Actual performance impact validated by benchmarks (see commit message).
+
 ## [1.3.0] - 2026-01-07
 
 ### Performance

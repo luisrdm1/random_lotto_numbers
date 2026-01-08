@@ -61,6 +61,30 @@ impl BitwiseStrategy {
             Ok(Self::VecU64)
         }
     }
+
+    /// Generates a TicketKey using this strategy.
+    ///
+    /// # Arguments
+    ///
+    /// * `range` - The range of ball numbers
+    /// * `count` - Number of balls to pick
+    /// * `rng` - Random number generator
+    ///
+    /// # Returns
+    ///
+    /// A TicketKey generated using the selected bitmap strategy
+    pub fn generate<R: RandomNumberGenerator>(
+        self,
+        range: &BallRange,
+        count: PickCount,
+        rng: &mut R,
+    ) -> Result<TicketKey, LottoError> {
+        match self {
+            Self::U64 => generate_ticketkey_u64_bitmap(range, count, rng),
+            Self::U128 => generate_ticketkey_u128_bitmap(range, count, rng),
+            Self::VecU64 => generate_ticketkey_vec_bitmap(range, count, rng),
+        }
+    }
 }
 
 /// Generates a lottery ticket using u64 bitmap for duplicate checking.
@@ -330,7 +354,7 @@ pub fn generate_ticketkey_u64_bitmap<R: RandomNumberGenerator>(
 
     // Validate invariants
     let actual_count = bitmap.count_ones() as usize;
-    assert_eq!(
+    debug_assert_eq!(
         actual_count, picks,
         "bitmap should have exactly {} bits set, got {}",
         picks, actual_count
@@ -342,7 +366,7 @@ pub fn generate_ticketkey_u64_bitmap<R: RandomNumberGenerator>(
     } else {
         (1u64 << range.size()) - 1
     };
-    assert_eq!(
+    debug_assert_eq!(
         bitmap & !valid_mask,
         0,
         "bitmap 0x{:016X} has bits set outside valid range (mask: 0x{:016X})",
@@ -400,7 +424,7 @@ pub fn generate_ticketkey_u128_bitmap<R: RandomNumberGenerator>(
 
     // Validate invariants
     let actual_count = bitmap.count_ones() as usize;
-    assert_eq!(
+    debug_assert_eq!(
         actual_count, picks,
         "bitmap should have exactly {} bits set, got {}",
         picks, actual_count
@@ -412,7 +436,7 @@ pub fn generate_ticketkey_u128_bitmap<R: RandomNumberGenerator>(
     } else {
         (1u128 << range.size()) - 1
     };
-    assert_eq!(
+    debug_assert_eq!(
         bitmap & !valid_mask,
         0,
         "bitmap 0x{:032X} has bits set outside valid range (mask: 0x{:032X})",
@@ -467,7 +491,7 @@ pub fn generate_ticketkey_vec_bitmap<R: RandomNumberGenerator>(
 
     // Validate invariants
     let actual_count: usize = bitmap.iter().map(|w| w.count_ones() as usize).sum();
-    assert_eq!(
+    debug_assert_eq!(
         actual_count, picks,
         "bitmap should have exactly {} bits set, got {}",
         picks, actual_count
@@ -478,7 +502,7 @@ pub fn generate_ticketkey_vec_bitmap<R: RandomNumberGenerator>(
     if remaining_bits > 0 {
         let last_word = bitmap[words_needed - 1];
         let last_mask = (1u64 << remaining_bits) - 1;
-        assert_eq!(
+        debug_assert_eq!(
             last_word & !last_mask,
             0,
             "bitmap has bits set outside valid range in last word"

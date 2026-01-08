@@ -40,7 +40,7 @@ pub fn generate_ticket<R: RandomNumberGenerator>(
 ) -> Ticket {
     // Try bitwise strategy first (fastest, 55-67% performance improvement)
     if let Ok(key) = crate::ticket_bitwise::generate_ticketkey_bitwise(range, *pick, rng) {
-        return Ticket::new(key.to_balls(range));
+        return Ticket::from_sorted(key.to_balls(range));
     }
 
     // Fallback to HashSet strategy for edge cases or errors
@@ -180,10 +180,12 @@ pub fn generate_unique_tickets<R: RandomNumberGenerator>(
     // Calculate a reasonable maximum number of attempts
     // For small ratios (requested/possible), this is generous
     // For large ratios (approaching maximum), we need many more attempts
-    let ratio = (game_count.value() as f64) / (max_possible as f64);
-    let max_attempts = if ratio < 0.5 {
+    let requested = game_count.value() as u128;
+    let max_attempts = if requested * 2 < max_possible {
+        // ratio < 0.5
         game_count.value() * 100
-    } else if ratio < 0.8 {
+    } else if requested * 10 < max_possible * 8 {
+        // ratio < 0.8
         game_count.value() * 1000
     } else {
         game_count.value() * 10000
@@ -192,10 +194,7 @@ pub fn generate_unique_tickets<R: RandomNumberGenerator>(
     let mut attempts = 0;
 
     // Hoist strategy selection outside the loop (doesn't change per iteration)
-    use crate::ticket_bitwise::{
-        BitwiseStrategy, generate_ticketkey_u64_bitmap, generate_ticketkey_u128_bitmap,
-        generate_ticketkey_vec_bitmap,
-    };
+    use crate::ticket_bitwise::BitwiseStrategy;
     let strategy = BitwiseStrategy::select(range)?;
 
     while ticket_keys.len() < game_count.value() {
@@ -206,12 +205,8 @@ pub fn generate_unique_tickets<R: RandomNumberGenerator>(
             });
         }
 
-        // Generate TicketKey directly without intermediate Vec<BallNumber>
-        let key = match strategy {
-            BitwiseStrategy::U64 => generate_ticketkey_u64_bitmap(range, *pick, rng)?,
-            BitwiseStrategy::U128 => generate_ticketkey_u128_bitmap(range, *pick, rng)?,
-            BitwiseStrategy::VecU64 => generate_ticketkey_vec_bitmap(range, *pick, rng)?,
-        };
+        // Generate TicketKey using selected strategy
+        let key = strategy.generate(range, *pick, rng)?;
         ticket_keys.insert(key);
         attempts += 1;
     }
