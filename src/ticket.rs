@@ -191,6 +191,13 @@ pub fn generate_unique_tickets<R: RandomNumberGenerator>(
 
     let mut attempts = 0;
 
+    // Hoist strategy selection outside the loop (doesn't change per iteration)
+    use crate::ticket_bitwise::{
+        BitwiseStrategy, generate_ticketkey_u64_bitmap, generate_ticketkey_u128_bitmap,
+        generate_ticketkey_vec_bitmap,
+    };
+    let strategy = BitwiseStrategy::select(range)?;
+
     while ticket_keys.len() < game_count.value() {
         if attempts >= max_attempts {
             return Err(crate::error::LottoError::UniqueGenerationFailed {
@@ -200,15 +207,20 @@ pub fn generate_unique_tickets<R: RandomNumberGenerator>(
         }
 
         // Generate TicketKey directly without intermediate Vec<BallNumber>
-        let key = crate::ticket_bitwise::generate_ticketkey_bitwise(range, *pick, rng)?;
+        let key = match strategy {
+            BitwiseStrategy::U64 => generate_ticketkey_u64_bitmap(range, *pick, rng)?,
+            BitwiseStrategy::U128 => generate_ticketkey_u128_bitmap(range, *pick, rng)?,
+            BitwiseStrategy::VecU64 => generate_ticketkey_vec_bitmap(range, *pick, rng)?,
+        };
         ticket_keys.insert(key);
         attempts += 1;
     }
 
     // Convert TicketKey back to Ticket only at the end
+    // Use from_sorted since to_balls() returns pre-sorted Vec
     Ok(ticket_keys
         .into_iter()
-        .map(|key| Ticket::new(key.to_balls(range)))
+        .map(|key| Ticket::from_sorted(key.to_balls(range)))
         .collect())
 }
 

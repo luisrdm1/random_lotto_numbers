@@ -4,22 +4,7 @@ Gerador de bilhetes de loteria em Rust com estratégias otimizadas por bitwise o
 
 ## ⚡ Performance
 
-### Geração Direta com TicketKey (v1.2.0+)
-
-**30% mais rápido** que versão anterior através de geração direta de bitmaps:
-
-| Operação | Tempo | vs v1.1 |
-|----------|-------|---------|
-| Mega-Sena 1000 jogos | 117 µs | **-30%** (era 167 µs) |
-| Lotomania 100 jogos | 89 µs | **-23%** (era 115 µs) |
-
-**Fluxo otimizado**:
-```
-ANTES (v1.1):  bitmap → Vec<BallNumber> → TicketKey → HashSet
-AGORA (v1.2):  bitmap → TicketKey → HashSet → Vec (só na saída)
-```
-
-### Estratégias de Geração
+Geração otimizada usando operações bitwise:
 
 - **Estratégia principal**: Operações bitwise com TicketKey direto
 - **Fallback automático**: HashSet para casos especiais

@@ -73,40 +73,55 @@ impl TicketKey {
 
     /// Convert TicketKey back to Vec<BallNumber>.
     ///
+    /// Returns a pre-sorted vector (bits are iterated in order).
+    ///
     /// # Arguments
     ///
     /// * `range` - The valid range (needed to calculate absolute ball values)
     pub fn to_balls(&self, range: &BallRange) -> Vec<BallNumber> {
         let min = range.start().value();
-        let mut balls = Vec::new();
-
         let range_size = range.size();
+
+        // Pre-allocate capacity to avoid reallocations
+        let mut balls = Vec::with_capacity(self.count_balls());
 
         match self {
             TicketKey::U64(bitmap) => {
-                for i in 0..range_size.min(64) {
-                    if bitmap & (1u64 << i) != 0 {
-                        balls.push(BallNumber::new(min + i as u8));
+                // Optimize with trailing_zeros: O(pick) instead of O(range_size)
+                let mut bits = *bitmap;
+                while bits != 0 {
+                    let i = bits.trailing_zeros() as usize;
+                    if i >= range_size {
+                        break;
                     }
+                    balls.push(BallNumber::new(min + i as u8));
+                    bits &= bits - 1; // Clear lowest set bit
                 }
             }
             TicketKey::U128(bitmap) => {
-                for i in 0..range_size.min(128) {
-                    if bitmap & (1u128 << i) != 0 {
-                        balls.push(BallNumber::new(min + i as u8));
+                // Optimize with trailing_zeros: O(pick) instead of O(range_size)
+                let mut bits = *bitmap;
+                while bits != 0 {
+                    let i = bits.trailing_zeros() as usize;
+                    if i >= range_size {
+                        break;
                     }
+                    balls.push(BallNumber::new(min + i as u8));
+                    bits &= bits - 1; // Clear lowest set bit
                 }
             }
             TicketKey::VecU64(bitmap) => {
+                // Iterate through each word, using trailing_zeros for set bits
                 for (idx, &word) in bitmap.iter().enumerate() {
-                    for bit in 0..64 {
+                    let mut bits = word;
+                    while bits != 0 {
+                        let bit = bits.trailing_zeros() as usize;
                         let offset = idx * 64 + bit;
                         if offset >= range_size {
                             break;
                         }
-                        if word & (1u64 << bit) != 0 {
-                            balls.push(BallNumber::new(min + offset as u8));
-                        }
+                        balls.push(BallNumber::new(min + offset as u8));
+                        bits &= bits - 1; // Clear lowest set bit
                     }
                 }
             }

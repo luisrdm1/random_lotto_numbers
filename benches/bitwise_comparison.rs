@@ -5,7 +5,7 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use lotto_quick_pick::newtypes::{BallNumber, BallRange, PickCount};
 use lotto_quick_pick::ticket::generate_ticket;
-use lotto_quick_pick::ticket_bitwise::generate_ticket_bitwise;
+use lotto_quick_pick::ticket_bitwise::generate_ticketkey_bitwise;
 use std::hint::black_box;
 
 fn bench_hashset_mega_sena(c: &mut Criterion) {
@@ -27,7 +27,7 @@ fn bench_bitwise_mega_sena(c: &mut Criterion) {
 
         b.iter(|| {
             let mut rng = rand::rng();
-            generate_ticket_bitwise(black_box(&range), black_box(count), black_box(&mut rng))
+            generate_ticketkey_bitwise(black_box(&range), black_box(count), black_box(&mut rng))
         });
     });
 }
@@ -51,7 +51,7 @@ fn bench_bitwise_lotomania(c: &mut Criterion) {
 
         b.iter(|| {
             let mut rng = rand::rng();
-            generate_ticket_bitwise(black_box(&range), black_box(count), black_box(&mut rng))
+            generate_ticketkey_bitwise(black_box(&range), black_box(count), black_box(&mut rng))
         });
     });
 }
@@ -75,7 +75,7 @@ fn bench_bitwise_large_range(c: &mut Criterion) {
 
         b.iter(|| {
             let mut rng = rand::rng();
-            generate_ticket_bitwise(black_box(&range), black_box(count), black_box(&mut rng))
+            generate_ticketkey_bitwise(black_box(&range), black_box(count), black_box(&mut rng))
         });
     });
 }
@@ -99,7 +99,7 @@ fn bench_bitwise_small_picks(c: &mut Criterion) {
 
         b.iter(|| {
             let mut rng = rand::rng();
-            generate_ticket_bitwise(black_box(&range), black_box(count), black_box(&mut rng))
+            generate_ticketkey_bitwise(black_box(&range), black_box(count), black_box(&mut rng))
         });
     });
 }
@@ -123,7 +123,7 @@ fn bench_bitwise_powerball(c: &mut Criterion) {
 
         b.iter(|| {
             let mut rng = rand::rng();
-            generate_ticket_bitwise(black_box(&range), black_box(count), black_box(&mut rng))
+            generate_ticketkey_bitwise(black_box(&range), black_box(count), black_box(&mut rng))
         });
     });
 }

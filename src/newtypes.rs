@@ -216,6 +216,26 @@ impl Ticket {
         Self { balls }
     }
 
+    /// Create a Ticket from a pre-sorted vector of ball numbers.
+    ///
+    /// This is an internal optimization to avoid unnecessary sorting
+    /// when the balls are already known to be sorted (e.g., from TicketKey::to_balls).
+    ///
+    /// # Arguments
+    ///
+    /// * `balls` - Vector of ball numbers (must already be sorted)
+    ///
+    /// # Safety
+    ///
+    /// Caller must ensure balls are sorted. In debug builds, this is validated.
+    pub(crate) fn from_sorted(balls: Vec<BallNumber>) -> Self {
+        debug_assert!(
+            balls.windows(2).all(|w| w[0] <= w[1]),
+            "Balls must be sorted"
+        );
+        Self { balls }
+    }
+
     /// Create a new validated Ticket.
     ///
     /// This constructor validates that:

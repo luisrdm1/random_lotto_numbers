@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-01-07
+
+### Performance
+
+- **Hoisted strategy selection**: `BitwiseStrategy::select()` moved outside hot loop in `generate_unique_tickets()`
+  - Eliminates redundant strategy selection on every ticket generation
+  - Strategy determined once per batch instead of per ticket
+
+- **Optimized `to_balls()` with `trailing_zeros()`**: Changed from O(range_size) to O(pick_count)
+  - Uses bit manipulation (`trailing_zeros()` + `bits &= bits - 1`) to iterate only set bits
+  - For Mega-Sena (6 picks from 60 range): iterates 6 times instead of 60
+  - Mega-Sena single ticket: **52.6ns** (2.2x faster than HashSet)
+  - Mega-Sena 3 picks: **14.4ns** (2.9x faster than HashSet)
+
+- **Pre-allocated vectors**: Added `Vec::with_capacity(count_balls())` in `to_balls()`
+  - Eliminates incremental reallocations during ball collection
+  - Single allocation at exact required size
+
+- **Eliminated unnecessary sorting**: New `Ticket::from_sorted()` method
+  - `to_balls()` returns pre-sorted Vec (bits iterated in ascending order)
+  - Skips redundant `sort_unstable()` call in final conversion
+  - Includes `debug_assert!` to validate sorted invariant
+
+### Changed
+
+- **Updated tests and benchmarks**: All deprecated function calls replaced with `_ticketkey_` variants
+  - 8 tests in `ticket_bitwise.rs` migrated
+  - 6 benchmark functions in `bitwise_comparison.rs` migrated
+  - Zero clippy warnings
+
+### Performance Benchmarks
+
+Comparison of HashSet vs Bitwise (with all optimizations):
+
+| Scenario | HashSet | Bitwise | Speedup | Improvement vs v1.2.0 |
+|----------|---------|---------|---------|----------------------|
+| Mega-Sena 6 picks | 52.6 ns | 23.6 ns | **2.23x** | HashSet: -61.7%, Bitwise: -48.4% |
+| Mega-Sena 3 picks | 41.2 ns | 14.4 ns | **2.86x** | HashSet: -52.1%, Bitwise: -55.2% |
+| Lotomania 50 picks | 447.7 ns | 374.3 ns | **1.20x** | HashSet: -58.9%, Bitwise: -23.4% |
+| Powerball 5 picks | 52.9 ns | 23.4 ns | **2.26x** | HashSet: -55.0%, Bitwise: -46.5% |
+| Range 200, 10 picks | 111.0 ns | 67.6 ns | **1.64x** | HashSet: -44.7%, Bitwise: -19.0% |
+
+**Key insight**: Optimizations benefit both implementations, with bitwise maintaining 1.2x-2.9x advantage.
+
 ## [1.2.0] - 2026-01-07
 
 ### Added

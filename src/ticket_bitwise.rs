@@ -268,6 +268,7 @@ pub fn generate_ticket_vec_bitmap<R: RandomNumberGenerator>(
     since = "1.2.0",
     note = "Use generate_ticketkey_bitwise() instead for better performance"
 )]
+#[allow(deprecated)]
 pub fn generate_ticket_bitwise<R: RandomNumberGenerator>(
     range: &BallRange,
     count: PickCount,
@@ -562,7 +563,8 @@ mod tests {
         let count = PickCount::new(6, &range).unwrap();
         let mut rng = rand::rng();
 
-        let ticket = generate_ticket_u64_bitmap(&range, count, &mut rng).unwrap();
+        let key = generate_ticketkey_u64_bitmap(&range, count, &mut rng).unwrap();
+        let ticket = key.to_balls(&range);
 
         assert_eq!(ticket.len(), 6);
 
@@ -585,7 +587,8 @@ mod tests {
         let count = PickCount::new(50, &range).unwrap();
         let mut rng = rand::rng();
 
-        let ticket = generate_ticket_u128_bitmap(&range, count, &mut rng).unwrap();
+        let key = generate_ticketkey_u128_bitmap(&range, count, &mut rng).unwrap();
+        let ticket = key.to_balls(&range);
 
         assert_eq!(ticket.len(), 50);
 
@@ -608,7 +611,8 @@ mod tests {
         let count = PickCount::new(10, &range).unwrap();
         let mut rng = rand::rng();
 
-        let ticket = generate_ticket_vec_bitmap(&range, count, &mut rng).unwrap();
+        let key = generate_ticketkey_vec_bitmap(&range, count, &mut rng).unwrap();
+        let ticket = key.to_balls(&range);
 
         assert_eq!(ticket.len(), 10);
 
@@ -631,24 +635,24 @@ mod tests {
 
         // Test u64 strategy
         let range1 = BallRange::mega_sena();
-        let ticket1 =
-            generate_ticket_bitwise(&range1, PickCount::new(6, &range1).unwrap(), &mut rng)
+        let key1 =
+            generate_ticketkey_bitwise(&range1, PickCount::new(6, &range1).unwrap(), &mut rng)
                 .unwrap();
-        assert_eq!(ticket1.len(), 6);
+        assert_eq!(key1.count_balls(), 6);
 
         // Test u128 strategy
         let range2 = BallRange::lotomania();
-        let ticket2 =
-            generate_ticket_bitwise(&range2, PickCount::new(50, &range2).unwrap(), &mut rng)
+        let key2 =
+            generate_ticketkey_bitwise(&range2, PickCount::new(50, &range2).unwrap(), &mut rng)
                 .unwrap();
-        assert_eq!(ticket2.len(), 50);
+        assert_eq!(key2.count_balls(), 50);
 
         // Test Vec<u64> strategy
         let range3 = BallRange::new(BallNumber::new(1), BallNumber::new(200)).unwrap();
-        let ticket3 =
-            generate_ticket_bitwise(&range3, PickCount::new(10, &range3).unwrap(), &mut rng)
+        let key3 =
+            generate_ticketkey_bitwise(&range3, PickCount::new(10, &range3).unwrap(), &mut rng)
                 .unwrap();
-        assert_eq!(ticket3.len(), 10);
+        assert_eq!(key3.count_balls(), 10);
     }
 
     #[test]
@@ -657,7 +661,7 @@ mod tests {
         let count = PickCount::new(5, &range).unwrap();
         let mut rng = rand::rng();
 
-        let result = generate_ticket_u64_bitmap(&range, count, &mut rng);
+        let result = generate_ticketkey_u64_bitmap(&range, count, &mut rng);
         assert!(result.is_err());
     }
 
@@ -667,7 +671,7 @@ mod tests {
         let count = PickCount::new(5, &range).unwrap();
         let mut rng = rand::rng();
 
-        let result = generate_ticket_u128_bitmap(&range, count, &mut rng);
+        let result = generate_ticketkey_u128_bitmap(&range, count, &mut rng);
         assert!(result.is_err());
     }
 
@@ -717,7 +721,7 @@ mod tests {
         let count = PickCount::new(5, &range).unwrap();
         let mut rng = rand::rng();
 
-        let result = generate_ticket_u64_bitmap(&range, count, &mut rng);
+        let result = generate_ticketkey_u64_bitmap(&range, count, &mut rng);
         assert!(
             result.is_err(),
             "u64_bitmap must reject range with size=65 (> 64)"
@@ -733,7 +737,7 @@ mod tests {
         let count = PickCount::new(5, &range).unwrap();
         let mut rng = rand::rng();
 
-        let result = generate_ticket_u128_bitmap(&range, count, &mut rng);
+        let result = generate_ticketkey_u128_bitmap(&range, count, &mut rng);
         assert!(
             result.is_err(),
             "u128_bitmap must reject range with size=129 (> 128)"
